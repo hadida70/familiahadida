@@ -1,9 +1,9 @@
 services:
   app:
-    build:
-      context: https://github.com/hadida70/familiahadida.git#main
+    image: node:22-alpine
     container_name: familiahadida-app
     restart: unless-stopped
+    working_dir: /app
     environment:
       - NODE_ENV=production
       - PORT=3000
@@ -16,6 +16,19 @@ services:
       - "traefik.http.routers.familiahadida.entrypoints=websecure"
       - "traefik.http.routers.familiahadida.tls.certresolver=letsencrypt"
       - "traefik.http.services.familiahadida.loadbalancer.server.port=3000"
+    command: >
+      sh -c "
+        apk add --no-cache git &&
+        if [ ! -d /app/repo/.git ]; then
+          git clone https://github.com/hadida70/familiahadida.git /app/repo
+        else
+          cd /app/repo && git pull
+        fi &&
+        cd /app/repo &&
+        npm install &&
+        npm run build &&
+        node dist/server.cjs
+      "
 
 volumes:
   familiahadida_data:
