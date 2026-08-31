@@ -1,0 +1,21 @@
+services:
+  app:
+    build:
+      context: https://github.com/hadida70/familiahadida.git#main
+    container_name: familiahadida-app
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DB_FILE=/app/data/groceries_db.json
+    volumes:
+      - familiahadida_data:/app/data
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.familiahadida.rule=Host(`app.hadida.cloud`)"
+      - "traefik.http.routers.familiahadida.entrypoints=websecure"
+      - "traefik.http.routers.familiahadida.tls.certresolver=letsencrypt"
+      - "traefik.http.services.familiahadida.loadbalancer.server.port=3000"
+
+volumes:
+  familiahadida_data:

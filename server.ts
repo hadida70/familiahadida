@@ -17,8 +17,8 @@ import {
   TodoItem,
 } from './src/types';
 
-const PORT = 3000;
-const DB_FILE = path.join(process.cwd(), 'groceries_db.json');
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+const DB_FILE = process.env.DB_FILE || path.join(process.cwd(), 'groceries_db.json');
 
 // Initial seed data with members, default Supermercado list, contacts, and calendar tasks
 const INITIAL_DATA: AppData = {
@@ -387,6 +387,10 @@ function loadDatabase(): AppData {
 
 function saveDatabase(data: AppData) {
   try {
+    const dir = path.dirname(DB_FILE);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
   } catch (err) {
     console.error('Error saving database file:', err);
@@ -394,8 +398,7 @@ function saveDatabase(data: AppData) {
 }
 
 let dbData = loadDatabase();
-// Clear existing items as explicitly requested
-dbData.items = [];
+dbData.items = dbData.items || [];
 dbData.personalRecords = dbData.personalRecords || [];
 dbData.dataCategories = dbData.dataCategories && dbData.dataCategories.length > 0 ? dbData.dataCategories : (INITIAL_DATA.dataCategories || []);
 dbData.calendarTasks = dbData.calendarTasks || INITIAL_DATA.calendarTasks || [];
