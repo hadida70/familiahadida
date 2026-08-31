@@ -1,0 +1,6 @@
+{
+  "name": "Familia Hadida",
+  "description": "Aplicación familiar colaborativa con calendario mensual y tareas, directorio de contactos telefónicos, listas de compras y gestión de datos personales.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
