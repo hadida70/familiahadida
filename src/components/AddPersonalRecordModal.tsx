@@ -22,6 +22,7 @@ interface AddPersonalRecordModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (record: Partial<PersonalRecord>) => void;
+  onUploadFile?: (file: File) => Promise<{ fileName: string; fileUrl: string; fileType: string; fileSize: number } | null>;
   members: Member[];
   activeMember: Member | null;
   editingRecord?: PersonalRecord | null;
@@ -52,6 +53,7 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
   isOpen,
   onClose,
   onSave,
+  onUploadFile,
   members,
   activeMember,
   editingRecord,
@@ -82,7 +84,9 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
   const [fileName, setFileName] = useState('');
   const [fileType, setFileType] = useState('');
   const [fileSize, setFileSize] = useState<number>(0);
+  const [fileUrl, setFileUrl] = useState<string>('');
   const [fileDataUrl, setFileDataUrl] = useState<string>('');
+  const [isUploading, setIsUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState('');
 
@@ -106,6 +110,7 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
       setFileName(editingRecord.fileName || '');
       setFileType(editingRecord.fileType || '');
       setFileSize(editingRecord.fileSize || 0);
+      setFileUrl(editingRecord.fileUrl || '');
       setFileDataUrl(editingRecord.fileDataUrl || '');
 
       setCardNumber(editingRecord.cardNumber || '');
@@ -234,9 +239,9 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
     setCardCvc(raw);
   };
 
-  const handleFileProcess = (file: File) => {
-    if (file.size > 25 * 1024 * 1024) {
-      setError('El archivo no debe superar los 25 MB');
+  const handleFileProcess = async (file: File) => {
+    if (file.size > 50 * 1024 * 1024) {
+      setError('El archivo no debe superar los 50 MB');
       return;
     }
 
@@ -252,6 +257,21 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
       }
     };
     reader.readAsDataURL(file);
+
+    // Try server disk upload if onUploadFile is provided
+    if (onUploadFile) {
+      try {
+        setIsUploading(true);
+        const uploadRes = await onUploadFile(file);
+        if (uploadRes && uploadRes.fileUrl) {
+          setFileUrl(uploadRes.fileUrl);
+        }
+      } catch (err) {
+        console.error('Upload failed, falling back to data URL:', err);
+      } finally {
+        setIsUploading(false);
+      }
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -282,6 +302,7 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
     setFileName('');
     setFileType('');
     setFileSize(0);
+    setFileUrl('');
     setFileDataUrl('');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -310,6 +331,7 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
       fileName: isCardMode ? '' : fileName,
       fileType: isCardMode ? '' : fileType,
       fileSize: isCardMode ? 0 : fileSize,
+      fileUrl: isCardMode ? '' : fileUrl,
       fileDataUrl: isCardMode ? '' : fileDataUrl,
       // Card fields
       cardNumber: isCardMode ? cardNumber.trim() : undefined,

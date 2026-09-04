@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, Crown, User, ShieldCheck, AlertCircle, Check } from 'lucide-react';
+import { Lock, Crown, ShieldCheck, AlertCircle, Check, Loader2 } from 'lucide-react';
 import { FamiliaHadidaLogo } from './FamiliaHadidaLogo';
 import { Member } from '../types';
 import { getMemberColorTheme } from '../lib/memberColors';
@@ -7,14 +7,14 @@ import { getMemberColorTheme } from '../lib/memberColors';
 interface PinLockScreenProps {
   members: Member[];
   onUnlock: (member: Member, isAdmin: boolean) => void;
+  onLogin?: (memberIdOrUsername: string, pin: string) => Promise<{ success: boolean; error?: string; user?: Member }>;
   initialMember?: Member | null;
 }
-
-const CORRECT_PIN = '1474';
 
 export const PinLockScreen: React.FC<PinLockScreenProps> = ({
   members,
   onUnlock,
+  onLogin,
   initialMember,
 }) => {
   // Find Jaime or member with admin role
@@ -37,6 +37,7 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [loading, setLoading] = useState(false);
 
   // Selected member object
   const selectedMember =
@@ -45,6 +46,7 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
     selectedMember.name.toUpperCase() === 'JAIME' || selectedMember.role === 'admin';
 
   const handleKeyPress = (digit: string) => {
+    if (loading) return;
     if (pin.length < 4) {
       const newPin = pin + digit;
       setPin(newPin);
@@ -58,36 +60,62 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
   };
 
   const handleDelete = () => {
+    if (loading) return;
     setPin((prev) => prev.slice(0, -1));
     setError(false);
     setErrorMessage('');
   };
 
   const handleClear = () => {
+    if (loading) return;
     setPin('');
     setError(false);
     setErrorMessage('');
   };
 
-  const verifyPin = (enteredPin: string) => {
-    if (enteredPin === CORRECT_PIN) {
-      const isAdmin = isSelectedAdmin;
-      const authenticatedMember: Member = {
-        ...selectedMember,
-        role: isAdmin ? 'admin' : 'member',
-      };
+  const verifyPin = async (enteredPin: string) => {
+    setLoading(true);
+    setError(false);
+    setErrorMessage('');
 
-      localStorage.setItem('hadida_family_auth', 'authenticated');
-      localStorage.setItem('hadida_family_auth_role', isAdmin ? 'admin' : 'member');
-      localStorage.setItem('hadida_family_auth_member_id', authenticatedMember.id);
-
-      onUnlock(authenticatedMember, isAdmin);
-    } else {
+    try {
+      if (onLogin) {
+        const result = await onLogin(selectedMember.id, enteredPin);
+        if (result.success && result.user) {
+          const isAdmin = result.user.role === 'admin';
+          onUnlock(result.user, isAdmin);
+        } else {
+          setError(true);
+          setErrorMessage(result.error || 'PIN incorrecto.');
+          setTimeout(() => {
+            setPin('');
+          }, 600);
+        }
+      } else {
+        // Fallback direct check
+        if (enteredPin === '1474') {
+          const isAdmin = isSelectedAdmin;
+          const authenticatedMember: Member = {
+            ...selectedMember,
+            role: isAdmin ? 'admin' : 'member',
+          };
+          localStorage.setItem('hadida_family_auth', 'authenticated');
+          localStorage.setItem('hadida_family_auth_role', isAdmin ? 'admin' : 'member');
+          localStorage.setItem('hadida_family_auth_member_id', authenticatedMember.id);
+          onUnlock(authenticatedMember, isAdmin);
+        } else {
+          setError(true);
+          setErrorMessage('PIN incorrecto. Ingresa 1474.');
+          setTimeout(() => {
+            setPin('');
+          }, 600);
+        }
+      }
+    } catch {
       setError(true);
-      setErrorMessage('PIN incorrecto. Ingresa 1474.');
-      setTimeout(() => {
-        setPin('');
-      }, 500);
+      setErrorMessage('Error al conectar con el servidor.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -104,7 +132,7 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [pin, selectedMemberId]);
+  }, [pin, selectedMemberId, loading]);
 
   return (
     <div
@@ -120,7 +148,7 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
         {/* Security Prompt */}
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 border border-slate-700/80 text-slate-300 text-xs font-bold mb-3 shadow-inner">
           <Lock className="w-3.5 h-3.5 text-amber-400" />
-          <span>Acceso Privado Familiar • PIN 1474</span>
+          <span>Acceso Seguro con Base de Datos SQLite</span>
         </div>
 
         {/* Step 1: User Profile Selection */}
@@ -135,7 +163,7 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
           </div>
 
           {/* Members Grid / Pills */}
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2 max-h-52 overflow-y-auto pr-1">
             {members.map((member) => {
               const isAdmin =
                 member.name.toUpperCase() === 'JAIME' || member.role === 'admin';
@@ -184,7 +212,7 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
                       isAdmin ? 'text-amber-300/80' : 'text-slate-400'
                     }`}
                   >
-                    {isAdmin ? '👑 Administrador (Total)' : '👤 Familiar (Personal)'}
+                    {isAdmin ? '👑 Administrador (Total)' : '👤 Familiar (Listas/Docs)'}
                   </span>
                 </button>
               );
@@ -207,8 +235,8 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
 
           <p className="text-[11px] text-slate-400 mb-3 text-center">
             {isSelectedAdmin
-              ? 'Introduce el PIN 1474 para acceso con permisos completos.'
-              : 'Introduce el PIN 1474 para acceder a tu perfil familiar.'}
+              ? 'Introduce tu PIN (predeterminado 1474) para acceso completo.'
+              : 'Introduce tu PIN (predeterminado 1474) para acceder a tu sesión.'}
           </p>
 
           {/* PIN Dots Indicator */}
@@ -232,14 +260,19 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
             })}
           </div>
 
-          {/* Error message */}
-          <div className="h-5 mb-2">
-            {error && (
-              <p className="text-xs font-bold text-rose-400 flex items-center justify-center gap-1 animate-shake">
-                <AlertCircle className="w-3.5 h-3.5" />
+          {/* Error / Loading message */}
+          <div className="h-5 mb-2 flex items-center justify-center">
+            {loading ? (
+              <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                Verificando credenciales...
+              </span>
+            ) : error ? (
+              <p className="text-xs font-bold text-rose-400 flex items-center justify-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                 {errorMessage}
               </p>
-            )}
+            ) : null}
           </div>
 
           {/* Numeric Keypad */}
@@ -247,30 +280,34 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
             {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((num) => (
               <button
                 key={num}
+                disabled={loading}
                 onClick={() => handleKeyPress(num)}
-                className="h-12 sm:h-14 rounded-2xl bg-slate-950/80 hover:bg-slate-800 active:bg-slate-700 border border-slate-800 text-xl font-bold text-white transition-all shadow-md active:scale-95 cursor-pointer flex items-center justify-center select-none"
+                className="h-12 sm:h-14 rounded-2xl bg-slate-950/80 hover:bg-slate-800 active:bg-slate-700 border border-slate-800 text-xl font-bold text-white transition-all shadow-md active:scale-95 cursor-pointer flex items-center justify-center select-none disabled:opacity-50"
               >
                 {num}
               </button>
             ))}
 
             <button
+              disabled={loading}
               onClick={handleClear}
-              className="h-12 sm:h-14 rounded-2xl bg-slate-950/40 hover:bg-slate-800/60 active:bg-slate-800 border border-slate-800/60 text-xs font-bold text-slate-400 transition-all cursor-pointer flex items-center justify-center select-none"
+              className="h-12 sm:h-14 rounded-2xl bg-slate-950/40 hover:bg-slate-800/60 active:bg-slate-800 border border-slate-800/60 text-xs font-bold text-slate-400 transition-all cursor-pointer flex items-center justify-center select-none disabled:opacity-50"
             >
               Limpiar
             </button>
 
             <button
+              disabled={loading}
               onClick={() => handleKeyPress('0')}
-              className="h-12 sm:h-14 rounded-2xl bg-slate-950/80 hover:bg-slate-800 active:bg-slate-700 border border-slate-800 text-xl font-bold text-white transition-all shadow-md active:scale-95 cursor-pointer flex items-center justify-center select-none"
+              className="h-12 sm:h-14 rounded-2xl bg-slate-950/80 hover:bg-slate-800 active:bg-slate-700 border border-slate-800 text-xl font-bold text-white transition-all shadow-md active:scale-95 cursor-pointer flex items-center justify-center select-none disabled:opacity-50"
             >
               0
             </button>
 
             <button
+              disabled={loading}
               onClick={handleDelete}
-              className="h-12 sm:h-14 rounded-2xl bg-slate-950/40 hover:bg-slate-800/60 active:bg-slate-800 border border-slate-800/60 text-xs font-bold text-slate-400 transition-all cursor-pointer flex items-center justify-center select-none"
+              className="h-12 sm:h-14 rounded-2xl bg-slate-950/40 hover:bg-slate-800/60 active:bg-slate-800 border border-slate-800/60 text-xs font-bold text-slate-400 transition-all cursor-pointer flex items-center justify-center select-none disabled:opacity-50"
             >
               Borrar
             </button>
@@ -279,7 +316,7 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
 
         <div className="mt-4 text-center text-slate-500 text-xs flex items-center justify-center gap-1.5">
           <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-          <span>PIN Único Familiar: <strong>1474</strong></span>
+          <span>PIN Inicial de acceso: <strong>1474</strong></span>
         </div>
       </div>
     </div>

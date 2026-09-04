@@ -57,9 +57,10 @@ export const PersonalRecordCard: React.FC<PersonalRecordCardProps> = ({
   const isCard = isCreditCardRecord(record);
 
   const handleDownload = () => {
-    if (record.fileDataUrl) {
+    const targetUrl = record.fileUrl || record.fileDataUrl;
+    if (targetUrl) {
       const link = document.createElement('a');
-      link.href = record.fileDataUrl;
+      link.href = targetUrl;
       const downloadName =
         record.fileName ||
         `${(record.subcategory || record.category || 'documento')

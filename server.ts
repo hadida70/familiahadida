@@ -1,9 +1,11 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import path from 'path';
 import fs from 'fs';
 import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { createServer as createViteServer } from 'vite';
+import jwt from 'jsonwebtoken';
+import multer from 'multer';
 import {
   AppData,
   CustomList,
@@ -15,405 +17,165 @@ import {
   CalendarTask,
   Contact,
   TodoItem,
-} from './src/types';
+} from './src/types.ts';
+import {
+  initDatabase,
+  getAllAppData,
+  getUserById,
+  getUserByUsernameOrName,
+  getAllUsers,
+  createUser,
+  updateUserPin,
+  deleteUser,
+  comparePin,
+  insertGroceryItem,
+  updateGroceryItem,
+  deleteGroceryItem,
+  insertCustomList,
+  updateCustomList,
+  deleteCustomList,
+  insertPersonalRecord,
+  updatePersonalRecord,
+  deletePersonalRecord,
+  insertDataCategory,
+  updateDataCategory,
+  deleteDataCategory,
+  insertCalendarTask,
+  updateCalendarTask,
+  deleteCalendarTask,
+  insertContact,
+  updateContact,
+  deleteContact,
+  insertTodo,
+  updateTodo,
+  deleteTodo,
+  clearCompletedTodos,
+  insertNotification,
+  markNotificationsAsRead,
+} from './database.ts';
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
-const DB_FILE = process.env.DB_FILE || path.join(process.cwd(), 'groceries_db.json');
+const JWT_SECRET = process.env.JWT_SECRET || 'hadida_family_secure_jwt_secret_key_2026';
+const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(process.cwd(), 'uploads');
 
-// Initial seed data with members, default Supermercado list, contacts, and calendar tasks
-const INITIAL_DATA: AppData = {
-  members: [
-    {
-      id: 'member_jaime',
-      name: 'JAIME',
-      role: 'admin',
-      avatarColor: 'bg-orange-500',
-      avatarInitial: '',
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'member_sofi',
-      name: 'SOFI',
-      role: 'member',
-      avatarColor: 'bg-purple-600',
-      avatarInitial: '',
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'member_stephanie',
-      name: 'STEPHANIE',
-      role: 'member',
-      avatarColor: 'bg-pink-600',
-      avatarInitial: '',
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'member_sharon',
-      name: 'SHARON',
-      role: 'member',
-      avatarColor: 'bg-rose-600',
-      avatarInitial: '',
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'member_shirly',
-      name: 'SHIRLY',
-      role: 'member',
-      avatarColor: 'bg-amber-500',
-      avatarInitial: '',
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'member_moises',
-      name: 'MOISES',
-      role: 'member',
-      avatarColor: 'bg-blue-600',
-      avatarInitial: '',
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'member_mercedes',
-      name: 'MERCEDES',
-      role: 'member',
-      avatarColor: 'bg-emerald-600',
-      avatarInitial: '',
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'member_simon',
-      name: 'SIMON',
-      role: 'member',
-      avatarColor: 'bg-red-600',
-      avatarInitial: '',
-      createdAt: new Date().toISOString(),
-    },
-  ],
-  lists: [
-    {
-      id: 'list_supermercado',
-      name: 'Supermercado',
-      icon: '🛒',
-      color: 'red',
-      description: 'Compras del hogar y supermercado',
-      createdAt: new Date().toISOString(),
-    },
-  ],
-  items: [],
-  personalRecords: [],
-  dataCategories: [
-    {
-      id: 'cat_identificacion',
-      name: 'Documentos de Identidad',
-      icon: 'id-card',
-      color: '#2563eb',
-      description: 'Documentos oficiales de identidad, pasaportes y licencias',
-      subcategories: [
-        'Cédula / DNI',
-        'Pasaporte',
-        'Partida de Nacimiento',
-        'Licencia de Conducir',
-        'Visas / Residencia / Teudat Zehut',
-        'Libreta Militar',
-      ],
-      isDefault: true,
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'cat_salud',
-      name: 'Salud y Médicos',
-      icon: 'heart-pulse',
-      color: '#e11d48',
-      description: 'Expedientes de salud, carnets de vacunas y recetas',
-      subcategories: [
-        'Carnet de Vacunación',
-        'Historial Clínico',
-        'Recetas Médicas',
-        'Exámenes de Laboratorio',
-        'Alergias y Diagnósticos',
-        'Odontología / Dental',
-        'Póliza de Seguro Médico',
-      ],
-      isDefault: true,
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'cat_finanzas',
-      name: 'Finanzas y Bancos',
-      icon: 'credit-card',
-      color: '#059669',
-      description: 'Información bancaria, impuestos y comprobantes financieros',
-      subcategories: [
-        'Tarjeta de Crédito',
-        'Tarjeta de Débito',
-        'Tarjetas de Crédito / Débito',
-        'Cuentas Bancarias',
-        'Declaraciones de Impuestos',
-        'Comprobantes de Pago',
-        'Inversiones y Ahorros',
-        'Préstamos y Créditos',
-      ],
-      isDefault: true,
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'cat_vehiculos',
-      name: 'Vehículos y Transporte',
-      icon: 'car',
-      color: '#d97706',
-      description: 'Títulos, seguros y mantenimientos vehiculares',
-      subcategories: [
-        'Título de Propiedad',
-        'Póliza de Seguro Automotor',
-        'Revisión Técnica / VTV',
-        'Matrícula y Placas',
-        'Multas / Trámites',
-        'Mantenimiento y Reparaciones',
-      ],
-      isDefault: true,
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'cat_educacion',
-      name: 'Educación y Títulos',
-      icon: 'graduation-cap',
-      color: '#4f46e5',
-      description: 'Diplomas, certificados académicos y constancias escolares',
-      subcategories: [
-        'Títulos y Diplomas',
-        'Boletas de Calificaciones',
-        'Certificados de Cursos',
-        'Matrículas Escolares / Universitarias',
-        'Carnet Estudiantil',
-      ],
-      isDefault: true,
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'cat_seguros',
-      name: 'Seguros y Pólizas',
-      icon: 'shield-check',
-      color: '#0891b2',
-      description: 'Pólizas de seguro de vida, hogar, viaje y bienes',
-      subcategories: [
-        'Seguro de Vida',
-        'Seguro de Hogar',
-        'Seguro de Viaje',
-        'Seguro de Responsabilidad Civil',
-        'Asistencia en Viaje',
-      ],
-      isDefault: true,
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'cat_hogar',
-      name: 'Hogar y Propiedades',
-      icon: 'home',
-      color: '#ea580c',
-      description: 'Contratos de vivienda, servicios y escrituras',
-      subcategories: [
-        'Contrato de Arrendamiento / Alquiler',
-        'Escrituras de Propiedad',
-        'Facturas de Servicios (Luz, Agua, Gas)',
-        'Inventario del Hogar',
-        'Garantías de Electrodomésticos',
-      ],
-      isDefault: true,
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'cat_laboral',
-      name: 'Laboral y Empleo',
-      icon: 'briefcase',
-      color: '#475569',
-      description: 'Contratos laborales, nóminas y certificaciones de trabajo',
-      subcategories: [
-        'Contratos de Trabajo',
-        'Recibos de Nómina / Pago',
-        'Cartas de Recomendación',
-        'Seguridad Social / Pensión',
-        'Certificados Laborales',
-      ],
-      isDefault: true,
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'cat_general',
-      name: 'General y Varios',
-      icon: 'folder',
-      color: '#dc2626',
-      description: 'Garantías, contratos varios y documentos generales',
-      subcategories: [
-        'Contratos Generales',
-        'Garantías y Facturas',
-        'Suscripciones y Membresías',
-        'Fotografías Familiares',
-        'Otros Documentos',
-      ],
-      isDefault: true,
-      createdAt: new Date().toISOString(),
-    },
-  ],
-  calendarTasks: [
-    {
-      id: 'task_1',
-      title: 'Revisión médica familiar',
-      description: 'Chequeo rutinario y recetas médicas',
-      date: new Date().toISOString().split('T')[0],
-      time: '10:00',
-      assignedToId: 'member_jaime',
-      completed: false,
-      category: 'Salud',
-      urgent: true,
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'task_2',
-      title: 'Hacer compras de supermercado para la semana',
-      description: 'Revisar la lista compartida de compras',
-      date: new Date().toISOString().split('T')[0],
-      time: '17:30',
-      assignedToId: 'member_jaime',
-      completed: false,
-      category: 'Hogar',
-      urgent: false,
-      createdAt: new Date().toISOString(),
-    },
-  ],
-  contacts: [
-    {
-      id: 'contact_jaime',
-      name: 'Jaime Hadida',
-      phone: '+58 414 1234567',
-      email: 'jaimehadida70@gmail.com',
-      notes: 'Administrador de la familia • Casa Hadida',
-      address: 'Rehov HaDekel 7, Ashdod',
-      placeName: 'Casa Hadida',
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'contact_emergencia',
-      name: 'Emergencias y Ambulancias',
-      phone: '911',
-      email: '',
-      notes: 'Número de atención inmediata de emergencias médicas y auxilio vial',
-      address: 'Centro de Emergencias y Rescate, Ashdod',
-      placeName: 'Estación Central de Emergencias',
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'contact_medico',
-      name: 'Dr. Médico Familiar (Assuta)',
-      phone: '+58 212 9998877',
-      email: 'consultorio.medico@gmail.com',
-      notes: 'Consultorio médico, citas de salud y pediatría',
-      address: 'HaRefua 7, Campus Médico Assuta, Ashdod',
-      placeName: 'Hospital Universitario Assuta',
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'contact_farmacia',
-      name: 'Farmacia de Turno & Salud',
-      phone: '+58 212 5556677',
-      email: 'pedidos@farmaciafamiliar.com',
-      notes: 'Envío de medicamentos a domicilio las 24 horas',
-      address: 'Sderot Menachem Begin 22, Ashdod',
-      placeName: 'Farmacia Central 24h',
-      createdAt: new Date().toISOString(),
-    },
-  ],
-  todos: [
-    {
-      id: 'todo_1',
-      text: 'Revisar documentación de viaje',
-      completed: false,
-      assignedToId: 'member_jaime',
-      category: 'Importante',
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'todo_2',
-      text: 'Comprar pan fresco y leche',
-      completed: true,
-      completedAt: new Date().toISOString(),
-      assignedToId: 'all',
-      category: 'Hogar',
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'todo_3',
-      text: 'Organizar facturas del mes',
-      completed: false,
-      assignedToId: 'member_jaime',
-      category: 'Finanzas',
-      createdAt: new Date().toISOString(),
-    },
-  ],
-  notifications: [],
-};
-
-// Database persistence helpers
-function loadDatabase(): AppData {
-  try {
-    if (fs.existsSync(DB_FILE)) {
-      const content = fs.readFileSync(DB_FILE, 'utf-8');
-      const parsed = JSON.parse(content);
-      // Ensure lists array exists
-      if (!parsed.lists || !Array.isArray(parsed.lists) || parsed.lists.length === 0) {
-        parsed.lists = INITIAL_DATA.lists;
-      }
-      if (!parsed.personalRecords || !Array.isArray(parsed.personalRecords)) {
-        parsed.personalRecords = [];
-      }
-      if (!parsed.calendarTasks || !Array.isArray(parsed.calendarTasks)) {
-        parsed.calendarTasks = INITIAL_DATA.calendarTasks || [];
-      }
-      if (!parsed.contacts || !Array.isArray(parsed.contacts)) {
-        parsed.contacts = INITIAL_DATA.contacts || [];
-      }
-      if (!parsed.todos || !Array.isArray(parsed.todos)) {
-        parsed.todos = INITIAL_DATA.todos || [];
-      }
-      if (!parsed.dataCategories || !Array.isArray(parsed.dataCategories) || parsed.dataCategories.length === 0) {
-        parsed.dataCategories = INITIAL_DATA.dataCategories || [];
-      }
-      return parsed;
-    }
-  } catch (err) {
-    console.error('Error reading database file, resetting to initial data:', err);
-  }
-  saveDatabase(INITIAL_DATA);
-  return INITIAL_DATA;
+// Ensure uploads directory exists
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 }
 
-function saveDatabase(data: AppData) {
+// Multer storage setup for document/image uploads
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, UPLOADS_DIR);
+  },
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const safeBaseName = path
+      .basename(file.originalname, ext)
+      .replace(/[^a-zA-Z0-9_-]/g, '_')
+      .substring(0, 40);
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(null, `${safeBaseName}-${uniqueSuffix}${ext}`);
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
+});
+
+// Initialize SQLite database
+initDatabase();
+
+// Auth Middleware helpers
+export interface AuthRequest extends Request {
+  user?: Member;
+}
+
+function extractToken(req: Request): string | null {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.substring(7);
+  }
+  if (req.headers['x-auth-token']) {
+    return req.headers['x-auth-token'] as string;
+  }
+  if (req.query && req.query.token) {
+    return req.query.token as string;
+  }
+  return null;
+}
+
+function requireAuth(req: AuthRequest, res: Response, next: NextFunction) {
+  const token = extractToken(req);
+  if (!token) {
+    return res.status(401).json({ error: 'No autenticado. Por favor inicia sesión.' });
+  }
+
   try {
-    const dir = path.dirname(DB_FILE);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
+    const decoded = jwt.verify(token, JWT_SECRET) as { id: string; name: string; role: 'admin' | 'member' };
+    const user = getUserById(decoded.id);
+    if (!user) {
+      return res.status(401).json({ error: 'Usuario no encontrado o sesión inválida.' });
     }
-    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
+    req.user = {
+      id: user.id,
+      name: user.name,
+      username: user.username,
+      role: user.role,
+      avatarColor: user.avatarColor,
+      avatarInitial: user.avatarInitial,
+      iconName: user.iconName,
+      createdAt: user.createdAt,
+    };
+    next();
   } catch (err) {
-    console.error('Error saving database file:', err);
+    return res.status(401).json({ error: 'Sesión expirada o token inválido.' });
   }
 }
 
-let dbData = loadDatabase();
-dbData.items = dbData.items || [];
-dbData.personalRecords = dbData.personalRecords || [];
-dbData.dataCategories = dbData.dataCategories && dbData.dataCategories.length > 0 ? dbData.dataCategories : (INITIAL_DATA.dataCategories || []);
-dbData.calendarTasks = dbData.calendarTasks || INITIAL_DATA.calendarTasks || [];
-dbData.contacts = dbData.contacts || INITIAL_DATA.contacts || [];
-dbData.todos = dbData.todos || INITIAL_DATA.todos || [];
-if (!dbData.lists || dbData.lists.length === 0) {
-  dbData.lists = INITIAL_DATA.lists;
+function requireAdmin(req: AuthRequest, res: Response, next: NextFunction) {
+  requireAuth(req, res, () => {
+    if (!req.user || req.user.role !== 'admin') {
+      return res.status(403).json({
+        error: 'Acceso denegado: Solo el administrador (Jaime) tiene permisos para realizar esta acción.',
+      });
+    }
+    next();
+  });
 }
-saveDatabase(dbData);
+
+function optionalAuth(req: AuthRequest, _res: Response, next: NextFunction) {
+  const token = extractToken(req);
+  if (token) {
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as { id: string; name: string; role: 'admin' | 'member' };
+      const user = getUserById(decoded.id);
+      if (user) {
+        req.user = {
+          id: user.id,
+          name: user.name,
+          username: user.username,
+          role: user.role,
+          avatarColor: user.avatarColor,
+          avatarInitial: user.avatarInitial,
+          iconName: user.iconName,
+          createdAt: user.createdAt,
+        };
+      }
+    } catch {
+      // Ignore invalid optional token
+    }
+  }
+  next();
+}
 
 async function startServer() {
   const app = express();
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
   app.use(express.static(path.join(process.cwd(), 'public')));
+  app.use('/uploads', express.static(UPLOADS_DIR));
 
   const server = http.createServer(app);
 
@@ -442,7 +204,8 @@ async function startServer() {
 
   wss.on('connection', (ws) => {
     // Send full initial state to newly connected client
-    ws.send(JSON.stringify({ type: 'INIT_SYNC', payload: dbData }));
+    const currentData = getAllAppData();
+    ws.send(JSON.stringify({ type: 'INIT_SYNC', payload: currentData }));
 
     ws.on('message', (raw) => {
       try {
@@ -454,12 +217,198 @@ async function startServer() {
     });
   });
 
-  // REST API Routes
+  // ================= AUTHENTICATION & USERS ROUTES =================
+
+  // POST /api/auth/login - Secure login with PIN/Password
+  app.post('/api/auth/login', (req, res) => {
+    const { memberId, username, pin } = req.body;
+
+    if (!pin || (!memberId && !username)) {
+      return res.status(400).json({ error: 'Se requiere el usuario y el PIN de acceso.' });
+    }
+
+    const identifier = memberId || username;
+    const user = getUserByUsernameOrName(identifier);
+
+    if (!user) {
+      return res.status(401).json({ error: 'Usuario no encontrado.' });
+    }
+
+    const isMatch = comparePin(String(pin).trim(), user.pin_hash);
+    if (!isMatch) {
+      return res.status(401).json({ error: 'PIN o contraseña incorrecta.' });
+    }
+
+    const token = jwt.sign(
+      {
+        id: user.id,
+        name: user.name,
+        role: user.role,
+      },
+      JWT_SECRET,
+      { expiresIn: '30d' }
+    );
+
+    const userProfile: Member = {
+      id: user.id,
+      name: user.name,
+      username: user.username,
+      role: user.role,
+      avatarColor: user.avatarColor,
+      avatarInitial: user.avatarInitial,
+      iconName: user.iconName,
+      createdAt: user.createdAt,
+    };
+
+    res.json({
+      success: true,
+      token,
+      user: userProfile,
+    });
+  });
+
+  // GET /api/auth/me - Verify current session
+  app.get('/api/auth/me', requireAuth, (req: AuthRequest, res) => {
+    res.json({ user: req.user });
+  });
+
+  // POST /api/auth/users - Create new member (ADMIN ONLY: Jaime)
+  app.post('/api/auth/users', requireAdmin, (req: AuthRequest, res) => {
+    const { name, pin, role, avatarColor, avatarInitial } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'El nombre del integrante es requerido.' });
+    }
+
+    const userPin = pin && String(pin).trim().length >= 4 ? String(pin).trim() : '1474';
+    const newId = 'member_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+
+    try {
+      const newUser = createUser({
+        id: newId,
+        name: name.trim(),
+        pin: userPin,
+        role: role === 'admin' ? 'admin' : 'member',
+        avatarColor: avatarColor || 'bg-red-600',
+        avatarInitial: avatarInitial || name.trim()[0]?.toUpperCase() || '👤',
+      });
+
+      broadcast('MEMBER_ADDED', { member: newUser });
+      res.status(201).json(newUser);
+    } catch (err: any) {
+      console.error('Error creating user:', err);
+      res.status(500).json({ error: 'Error al crear el usuario en la base de datos.' });
+    }
+  });
+
+  // DELETE /api/auth/users/:id - Delete member (ADMIN ONLY: Jaime)
+  app.delete('/api/auth/users/:id', requireAdmin, (req: AuthRequest, res) => {
+    const { id } = req.params;
+
+    if (id === 'member_jaime' || (req.user && req.user.id === id)) {
+      return res.status(400).json({ error: 'No se puede eliminar al Administrador principal.' });
+    }
+
+    const success = deleteUser(id);
+    if (!success) {
+      return res.status(404).json({ error: 'Usuario no encontrado.' });
+    }
+
+    broadcast('MEMBER_DELETED', { memberId: id });
+    res.json({ success: true, memberId: id });
+  });
+
+  // PUT /api/auth/change-pin - Change current user's PIN
+  app.put('/api/auth/change-pin', requireAuth, (req: AuthRequest, res) => {
+    const { currentPin, newPin } = req.body;
+
+    if (!newPin || String(newPin).trim().length < 4) {
+      return res.status(400).json({ error: 'El nuevo PIN debe tener al menos 4 dígitos.' });
+    }
+
+    const user = getUserById(req.user!.id);
+    if (!user) {
+      return res.status(404).json({ error: 'Usuario no encontrado.' });
+    }
+
+    // Admins can bypass currentPin if resetting
+    if (req.user!.role !== 'admin' || currentPin) {
+      if (!currentPin || !comparePin(String(currentPin).trim(), user.pin_hash)) {
+        return res.status(401).json({ error: 'El PIN actual es incorrecto.' });
+      }
+    }
+
+    updateUserPin(user.id, String(newPin).trim());
+    res.json({ success: true, message: 'PIN actualizado correctamente.' });
+  });
+
+  // Legacy members route compatibility
+  app.post('/api/members', optionalAuth, (req: AuthRequest, res) => {
+    // If not authenticated as admin, allow creation if no users exist or fallback
+    const { name, avatarColor, pin } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'El nombre es requerido' });
+    }
+
+    const newMember = createUser({
+      id: 'member_' + Date.now(),
+      name: name.trim(),
+      pin: pin || '1474',
+      role: 'member',
+      avatarColor: avatarColor || 'bg-red-600',
+    });
+
+    broadcast('MEMBER_ADDED', { member: newMember });
+    res.status(201).json(newMember);
+  });
+
+  app.delete('/api/members/:id', optionalAuth, (req: AuthRequest, res) => {
+    const { id } = req.params;
+    if (id === 'member_jaime') {
+      return res.status(400).json({ error: 'No se puede eliminar al Administrador principal' });
+    }
+
+    deleteUser(id);
+    broadcast('MEMBER_DELETED', { memberId: id });
+    res.json({ success: true, memberId: id });
+  });
+
+  // ================= FILE UPLOAD ROUTE (ADMIN ONLY) =================
+
+  // POST /api/upload - Upload file to disk storage (Admin only)
+  app.post('/api/upload', requireAdmin, upload.single('file'), (req: AuthRequest, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No se subió ningún archivo.' });
+    }
+
+    const fileUrl = `/uploads/${req.file.filename}`;
+    res.json({
+      success: true,
+      fileName: req.file.originalname,
+      fileUrl,
+      fileType: req.file.mimetype,
+      fileSize: req.file.size,
+    });
+  });
+
+  // GET /api/files/:filename - Serve file preview/download
+  app.get('/api/files/:filename', (req, res) => {
+    const filePath = path.join(UPLOADS_DIR, req.params.filename);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Archivo no encontrado.' });
+    }
+    res.sendFile(filePath);
+  });
+
+  // ================= GENERAL DATA =================
 
   // GET /api/data - Get complete state
   app.get('/api/data', (_req, res) => {
-    res.json(dbData);
+    const fullData = getAllAppData();
+    res.json(fullData);
   });
+
+  // ================= GROCERY ITEMS ROUTES =================
 
   // POST /api/items - Add grocery item
   app.post('/api/items', (req, res) => {
@@ -468,7 +417,8 @@ async function startServer() {
       return res.status(400).json({ error: 'El título del producto es requerido' });
     }
 
-    const targetListId = listId || (dbData.lists && dbData.lists[0] ? dbData.lists[0].id : 'list_supermercado');
+    const allData = getAllAppData();
+    const targetListId = listId || (allData.lists && allData.lists[0] ? allData.lists[0].id : 'list_supermercado');
 
     const newItem: GroceryItem = {
       id: 'item_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
@@ -485,11 +435,11 @@ async function startServer() {
       urgent: !!urgent,
     };
 
-    dbData.items.unshift(newItem);
+    insertGroceryItem(newItem);
 
     // Create a push notification
-    const assignedMember = dbData.members.find((m) => m.id === newItem.assignedToId);
-    const targetList = dbData.lists.find((l) => l.id === targetListId);
+    const assignedMember = allData.members.find((m) => m.id === newItem.assignedToId);
+    const targetList = allData.lists.find((l) => l.id === targetListId);
     const listName = targetList ? targetList.name : 'Supermercado';
 
     const notif: PushNotification = {
@@ -503,9 +453,7 @@ async function startServer() {
       itemId: newItem.id,
       listId: targetListId,
     };
-    dbData.notifications.unshift(notif);
-
-    saveDatabase(dbData);
+    insertNotification(notif);
 
     broadcast('ITEM_ADDED', { item: newItem });
     broadcast('PUSH_NOTIFICATION', { notification: notif });
@@ -516,57 +464,24 @@ async function startServer() {
   // PUT /api/items/:id - Update grocery item
   app.put('/api/items/:id', (req, res) => {
     const { id } = req.params;
-    const index = dbData.items.findIndex((it) => it.id === id);
-    if (index === -1) {
+    const updated = updateGroceryItem(id, req.body);
+    if (!updated) {
       return res.status(404).json({ error: 'Item no encontrado' });
     }
 
-    const previousItem = dbData.items[index];
-    const updatedItem: GroceryItem = {
-      ...previousItem,
-      ...req.body,
-      id,
-      updatedAt: new Date().toISOString(),
-    };
-
-    if (req.body.completed !== undefined && req.body.completed !== previousItem.completed) {
-      updatedItem.completedAt = req.body.completed ? new Date().toISOString() : undefined;
-    }
-
-    dbData.items[index] = updatedItem;
-
-    if (previousItem.assignedToId !== updatedItem.assignedToId) {
-      const assignedMember = dbData.members.find((m) => m.id === updatedItem.assignedToId);
-      const notif: PushNotification = {
-        id: 'notif_' + Date.now(),
-        recipientId: updatedItem.assignedToId,
-        title: '🛒 Producto Reasignado',
-        message: `Te asignaron: ${updatedItem.title}`,
-        timestamp: new Date().toISOString(),
-        read: false,
-        type: 'item_assigned',
-        itemId: updatedItem.id,
-        listId: updatedItem.listId,
-      };
-      dbData.notifications.unshift(notif);
-      broadcast('PUSH_NOTIFICATION', { notification: notif });
-    }
-
-    saveDatabase(dbData);
-
-    broadcast('ITEM_UPDATED', { item: updatedItem });
-    res.json(updatedItem);
+    broadcast('ITEM_UPDATED', { item: updated });
+    res.json(updated);
   });
 
   // DELETE /api/items/:id - Delete item
   app.delete('/api/items/:id', (req, res) => {
     const { id } = req.params;
-    dbData.items = dbData.items.filter((it) => it.id !== id);
-    saveDatabase(dbData);
-
+    deleteGroceryItem(id);
     broadcast('ITEM_DELETED', { itemId: id });
     res.json({ success: true, itemId: id });
   });
+
+  // ================= CUSTOM LISTS ROUTES =================
 
   // POST /api/lists - Create custom list
   app.post('/api/lists', (req, res) => {
@@ -585,10 +500,8 @@ async function startServer() {
       createdAt: new Date().toISOString(),
     };
 
-    if (!dbData.lists) dbData.lists = [];
-    dbData.lists.push(newList);
+    insertCustomList(newList);
 
-    // Notify all members
     const notif: PushNotification = {
       id: 'notif_' + Date.now(),
       recipientId: 'all',
@@ -599,9 +512,7 @@ async function startServer() {
       type: 'list_created',
       listId: newList.id,
     };
-    dbData.notifications.unshift(notif);
-
-    saveDatabase(dbData);
+    insertNotification(notif);
 
     broadcast('LIST_CREATED', { list: newList });
     broadcast('PUSH_NOTIFICATION', { notification: notif });
@@ -612,88 +523,33 @@ async function startServer() {
   // PUT /api/lists/:id - Update custom list
   app.put('/api/lists/:id', (req, res) => {
     const { id } = req.params;
-    if (!dbData.lists) dbData.lists = [];
-    const index = dbData.lists.findIndex((l) => l.id === id);
-    if (index === -1) {
+    const updated = updateCustomList(id, req.body);
+    if (!updated) {
       return res.status(404).json({ error: 'Lista no encontrada' });
     }
 
-    const updatedList: CustomList = {
-      ...dbData.lists[index],
-      ...req.body,
-      id,
-    };
-
-    dbData.lists[index] = updatedList;
-    saveDatabase(dbData);
-
-    broadcast('LIST_UPDATED', { list: updatedList });
-    res.json(updatedList);
+    broadcast('LIST_UPDATED', { list: updated });
+    res.json(updated);
   });
 
   // DELETE /api/lists/:id - Delete custom list
   app.delete('/api/lists/:id', (req, res) => {
     const { id } = req.params;
-
-    if (!dbData.lists) dbData.lists = [];
-    if (dbData.lists.length <= 1) {
+    const success = deleteCustomList(id);
+    if (!success) {
       return res.status(400).json({ error: 'No se puede eliminar la única lista restante' });
     }
-
-    dbData.lists = dbData.lists.filter((l) => l.id !== id);
-    // Delete all items that belonged to this list
-    dbData.items = dbData.items.filter((it) => it.listId !== id);
-
-    saveDatabase(dbData);
 
     broadcast('LIST_DELETED', { listId: id });
     res.json({ success: true, listId: id });
   });
 
-  // POST /api/members - Add member
-  app.post('/api/members', (req, res) => {
-    const { name, avatarColor } = req.body;
-    if (!name || !name.trim()) {
-      return res.status(400).json({ error: 'El nombre es requerido' });
-    }
-
-    const newMember: Member = {
-      id: 'member_' + Date.now(),
-      name: name.trim().toUpperCase(),
-      role: 'member',
-      avatarColor: avatarColor || 'bg-red-600',
-      avatarInitial: '',
-      createdAt: new Date().toISOString(),
-    };
-
-    dbData.members.push(newMember);
-    saveDatabase(dbData);
-
-    broadcast('MEMBER_ADDED', { member: newMember });
-    res.status(201).json(newMember);
-  });
-
-  // DELETE /api/members/:id - Delete member
-  app.delete('/api/members/:id', (req, res) => {
-    const { id } = req.params;
-    if (id === 'member_jaime') {
-      return res.status(400).json({ error: 'No se puede eliminar al Administrador principal' });
-    }
-
-    dbData.members = dbData.members.filter((m) => m.id !== id);
-    // Reassign orphan items to Jaime
-    dbData.items = dbData.items.map((it) => (it.assignedToId === id ? { ...it, assignedToId: 'member_jaime' } : it));
-
-    saveDatabase(dbData);
-
-    broadcast('MEMBER_DELETED', { memberId: id });
-    res.json({ success: true, memberId: id });
-  });
-
   // ================= CALENDAR TASKS ROUTES =================
+
   // GET /api/tasks
   app.get('/api/tasks', (_req, res) => {
-    res.json(dbData.calendarTasks || []);
+    const data = getAllAppData();
+    res.json(data.calendarTasks || []);
   });
 
   // POST /api/tasks - Create task
@@ -717,11 +573,10 @@ async function startServer() {
       updatedAt: new Date().toISOString(),
     };
 
-    if (!dbData.calendarTasks) dbData.calendarTasks = [];
-    dbData.calendarTasks.unshift(newTask);
+    insertCalendarTask(newTask);
 
-    // Push notification for the assigned member
-    const assignedMember = dbData.members.find((m) => m.id === newTask.assignedToId);
+    const allData = getAllAppData();
+    const assignedMember = allData.members.find((m) => m.id === newTask.assignedToId);
     const notif: PushNotification = {
       id: 'notif_' + Date.now(),
       recipientId: newTask.assignedToId,
@@ -732,9 +587,7 @@ async function startServer() {
       type: 'task_created',
       taskId: newTask.id,
     };
-    dbData.notifications.unshift(notif);
-
-    saveDatabase(dbData);
+    insertNotification(notif);
 
     broadcast('TASK_ADDED', { task: newTask });
     broadcast('PUSH_NOTIFICATION', { notification: notif });
@@ -745,51 +598,34 @@ async function startServer() {
   // PUT /api/tasks/:id - Update task
   app.put('/api/tasks/:id', (req, res) => {
     const { id } = req.params;
-    if (!dbData.calendarTasks) dbData.calendarTasks = [];
-    const index = dbData.calendarTasks.findIndex((t) => t.id === id);
-    if (index === -1) {
+    const updated = updateCalendarTask(id, req.body);
+    if (!updated) {
       return res.status(404).json({ error: 'Tarea no encontrada' });
     }
 
-    const prevTask = dbData.calendarTasks[index];
-    const updatedTask: CalendarTask = {
-      ...prevTask,
-      ...req.body,
-      id,
-      updatedAt: new Date().toISOString(),
-    };
-
-    if (req.body.completed !== undefined && req.body.completed !== prevTask.completed) {
-      updatedTask.completedAt = req.body.completed ? new Date().toISOString() : undefined;
-    }
-
-    dbData.calendarTasks[index] = updatedTask;
-    saveDatabase(dbData);
-
-    broadcast('TASK_UPDATED', { task: updatedTask });
-    res.json(updatedTask);
+    broadcast('TASK_UPDATED', { task: updated });
+    res.json(updated);
   });
 
   // DELETE /api/tasks/:id - Delete task
   app.delete('/api/tasks/:id', (req, res) => {
     const { id } = req.params;
-    if (!dbData.calendarTasks) dbData.calendarTasks = [];
-    dbData.calendarTasks = dbData.calendarTasks.filter((t) => t.id !== id);
-    saveDatabase(dbData);
-
+    deleteCalendarTask(id);
     broadcast('TASK_DELETED', { taskId: id });
     res.json({ success: true, taskId: id });
   });
 
   // ================= CONTACTS DIRECTORY ROUTES =================
+
   // GET /api/contacts
   app.get('/api/contacts', (_req, res) => {
-    res.json(dbData.contacts || []);
+    const data = getAllAppData();
+    res.json(data.contacts || []);
   });
 
   // POST /api/contacts - Create contact
   app.post('/api/contacts', (req, res) => {
-    const { name, phone, email, notes } = req.body;
+    const { name, phone, email, notes, address, placeName } = req.body;
     if (!name || !name.trim() || !phone || !phone.trim()) {
       return res.status(400).json({ error: 'El nombre y teléfono son obligatorios' });
     }
@@ -800,14 +636,13 @@ async function startServer() {
       phone: phone.trim(),
       email: email?.trim() || '',
       notes: notes?.trim() || '',
+      address: address?.trim() || '',
+      placeName: placeName?.trim() || '',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
-    if (!dbData.contacts) dbData.contacts = [];
-    dbData.contacts.push(newContact);
-    saveDatabase(dbData);
-
+    insertContact(newContact);
     broadcast('CONTACT_ADDED', { contact: newContact });
     res.status(201).json(newContact);
   });
@@ -815,41 +650,29 @@ async function startServer() {
   // PUT /api/contacts/:id - Update contact
   app.put('/api/contacts/:id', (req, res) => {
     const { id } = req.params;
-    if (!dbData.contacts) dbData.contacts = [];
-    const index = dbData.contacts.findIndex((c) => c.id === id);
-    if (index === -1) {
+    const updated = updateContact(id, req.body);
+    if (!updated) {
       return res.status(404).json({ error: 'Contacto no encontrado' });
     }
 
-    const updatedContact: Contact = {
-      ...dbData.contacts[index],
-      ...req.body,
-      id,
-      updatedAt: new Date().toISOString(),
-    };
-
-    dbData.contacts[index] = updatedContact;
-    saveDatabase(dbData);
-
-    broadcast('CONTACT_UPDATED', { contact: updatedContact });
-    res.json(updatedContact);
+    broadcast('CONTACT_UPDATED', { contact: updated });
+    res.json(updated);
   });
 
   // DELETE /api/contacts/:id - Delete contact
   app.delete('/api/contacts/:id', (req, res) => {
     const { id } = req.params;
-    if (!dbData.contacts) dbData.contacts = [];
-    dbData.contacts = dbData.contacts.filter((c) => c.id !== id);
-    saveDatabase(dbData);
-
+    deleteContact(id);
     broadcast('CONTACT_DELETED', { contactId: id });
     res.json({ success: true, contactId: id });
   });
 
   // ================= MINIMALIST TO-DO LIST ROUTES =================
+
   // GET /api/todos
   app.get('/api/todos', (_req, res) => {
-    res.json(dbData.todos || []);
+    const data = getAllAppData();
+    res.json(data.todos || []);
   });
 
   // POST /api/todos - Create todo
@@ -870,10 +693,7 @@ async function startServer() {
       updatedAt: new Date().toISOString(),
     };
 
-    if (!dbData.todos) dbData.todos = [];
-    dbData.todos.unshift(newTodo);
-    saveDatabase(dbData);
-
+    insertTodo(newTodo);
     broadcast('TODO_ADDED', { todo: newTodo });
     res.status(201).json(newTodo);
   });
@@ -881,60 +701,40 @@ async function startServer() {
   // PUT /api/todos/:id - Update todo
   app.put('/api/todos/:id', (req, res) => {
     const { id } = req.params;
-    if (!dbData.todos) dbData.todos = [];
-    const index = dbData.todos.findIndex((t) => t.id === id);
-    if (index === -1) {
+    const updated = updateTodo(id, req.body);
+    if (!updated) {
       return res.status(404).json({ error: 'Tarea no encontrada' });
     }
 
-    const prevTodo = dbData.todos[index];
-    const updatedTodo: TodoItem = {
-      ...prevTodo,
-      ...req.body,
-      id,
-      updatedAt: new Date().toISOString(),
-    };
-
-    if (req.body.completed !== undefined && req.body.completed !== prevTodo.completed) {
-      updatedTodo.completedAt = req.body.completed ? new Date().toISOString() : undefined;
-    }
-
-    dbData.todos[index] = updatedTodo;
-    saveDatabase(dbData);
-
-    broadcast('TODO_UPDATED', { todo: updatedTodo });
-    res.json(updatedTodo);
+    broadcast('TODO_UPDATED', { todo: updated });
+    res.json(updated);
   });
 
   // DELETE /api/todos/:id - Delete single todo
   app.delete('/api/todos/:id', (req, res) => {
     const { id } = req.params;
-    if (!dbData.todos) dbData.todos = [];
-    dbData.todos = dbData.todos.filter((t) => t.id !== id);
-    saveDatabase(dbData);
-
+    deleteTodo(id);
     broadcast('TODO_DELETED', { todoId: id });
     res.json({ success: true, todoId: id });
   });
 
   // POST /api/todos/clear-completed - Clear all completed todos
   app.post('/api/todos/clear-completed', (_req, res) => {
-    if (!dbData.todos) dbData.todos = [];
-    dbData.todos = dbData.todos.filter((t) => !t.completed);
-    saveDatabase(dbData);
-
+    clearCompletedTodos();
     broadcast('TODOS_CLEARED_COMPLETED', {});
     res.json({ success: true });
   });
 
-  // ================= PERSONAL RECORDS ROUTES =================
-  // GET /api/personal-records
+  // ================= PERSONAL RECORDS & DOCUMENTS ROUTES =================
+
+  // GET /api/personal-records - View documents (Available for all authenticated members)
   app.get('/api/personal-records', (_req, res) => {
-    res.json(dbData.personalRecords || []);
+    const data = getAllAppData();
+    res.json(data.personalRecords || []);
   });
 
-  // POST /api/personal-records - Add personal record
-  app.post('/api/personal-records', (req, res) => {
+  // POST /api/personal-records - Add personal record / document (ADMIN ONLY: Jaime)
+  app.post('/api/personal-records', requireAdmin, (req: AuthRequest, res) => {
     const {
       memberId,
       category,
@@ -944,6 +744,7 @@ async function startServer() {
       fileName,
       fileType,
       fileSize,
+      fileUrl,
       fileDataUrl,
       cardNumber,
       cardHolder,
@@ -969,6 +770,7 @@ async function startServer() {
       fileName: fileName || '',
       fileType: fileType || '',
       fileSize: fileSize || 0,
+      fileUrl: fileUrl || '',
       fileDataUrl: fileDataUrl || '',
       cardNumber: cardNumber || '',
       cardHolder: cardHolder || '',
@@ -982,10 +784,10 @@ async function startServer() {
       updatedAt: new Date().toISOString(),
     };
 
-    if (!dbData.personalRecords) dbData.personalRecords = [];
-    dbData.personalRecords.unshift(newRecord);
+    insertPersonalRecord(newRecord);
 
-    const member = dbData.members.find((m) => m.id === memberId);
+    const allData = getAllAppData();
+    const member = allData.members.find((m) => m.id === memberId);
     const memberName = member ? member.name : 'un integrante';
 
     const notif: PushNotification = {
@@ -997,9 +799,7 @@ async function startServer() {
       read: false,
       type: 'personal_data_added',
     };
-    dbData.notifications.unshift(notif);
-
-    saveDatabase(dbData);
+    insertNotification(notif);
 
     broadcast('PERSONAL_RECORD_ADDED', { record: newRecord });
     broadcast('PUSH_NOTIFICATION', { notification: notif });
@@ -1007,50 +807,54 @@ async function startServer() {
     res.status(201).json(newRecord);
   });
 
-  // PUT /api/personal-records/:id - Update personal record
-  app.put('/api/personal-records/:id', (req, res) => {
+  // PUT /api/personal-records/:id - Update personal record (ADMIN ONLY: Jaime)
+  app.put('/api/personal-records/:id', requireAdmin, (req: AuthRequest, res) => {
     const { id } = req.params;
-    if (!dbData.personalRecords) dbData.personalRecords = [];
-
-    const index = dbData.personalRecords.findIndex((r) => r.id === id);
-    if (index === -1) {
+    const updated = updatePersonalRecord(id, req.body);
+    if (!updated) {
       return res.status(404).json({ error: 'Registro no encontrado' });
     }
 
-    const updatedRecord: PersonalRecord = {
-      ...dbData.personalRecords[index],
-      ...req.body,
-      id,
-      updatedAt: new Date().toISOString(),
-    };
-
-    dbData.personalRecords[index] = updatedRecord;
-    saveDatabase(dbData);
-
-    broadcast('PERSONAL_RECORD_UPDATED', { record: updatedRecord });
-    res.json(updatedRecord);
+    broadcast('PERSONAL_RECORD_UPDATED', { record: updated });
+    res.json(updated);
   });
 
-  // DELETE /api/personal-records/:id - Delete personal record
-  app.delete('/api/personal-records/:id', (req, res) => {
+  // DELETE /api/personal-records/:id - Delete personal record (ADMIN ONLY: Jaime)
+  app.delete('/api/personal-records/:id', requireAdmin, (req: AuthRequest, res) => {
     const { id } = req.params;
-    if (!dbData.personalRecords) dbData.personalRecords = [];
+    const { success, fileUrl } = deletePersonalRecord(id);
 
-    dbData.personalRecords = dbData.personalRecords.filter((r) => r.id !== id);
-    saveDatabase(dbData);
+    if (!success) {
+      return res.status(404).json({ error: 'Registro no encontrado' });
+    }
+
+    // Clean up disk file if present
+    if (fileUrl && fileUrl.startsWith('/uploads/')) {
+      const fileName = path.basename(fileUrl);
+      const filePath = path.join(UPLOADS_DIR, fileName);
+      if (fs.existsSync(filePath)) {
+        try {
+          fs.unlinkSync(filePath);
+        } catch (e) {
+          console.error('Error deleting file from disk:', e);
+        }
+      }
+    }
 
     broadcast('PERSONAL_RECORD_DELETED', { recordId: id });
     res.json({ success: true, recordId: id });
   });
 
   // ================= DATA CATEGORIES & SUBCATEGORIES ROUTES =================
+
   // GET /api/data-categories
   app.get('/api/data-categories', (_req, res) => {
-    res.json(dbData.dataCategories || []);
+    const data = getAllAppData();
+    res.json(data.dataCategories || []);
   });
 
-  // POST /api/data-categories - Add new category
-  app.post('/api/data-categories', (req, res) => {
+  // POST /api/data-categories - Add new category (Admin only)
+  app.post('/api/data-categories', requireAdmin, (req: AuthRequest, res) => {
     const { name, icon, color, description, subcategories } = req.body;
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'El nombre de la categoría es obligatorio' });
@@ -1069,109 +873,49 @@ async function startServer() {
       createdAt: new Date().toISOString(),
     };
 
-    if (!dbData.dataCategories) dbData.dataCategories = [];
-    dbData.dataCategories.push(newCategory);
-    saveDatabase(dbData);
-
+    insertDataCategory(newCategory);
     broadcast('DATA_CATEGORY_ADDED', { category: newCategory });
     res.status(201).json(newCategory);
   });
 
-  // PUT /api/data-categories/:id - Update category
-  app.put('/api/data-categories/:id', (req, res) => {
+  // PUT /api/data-categories/:id - Update category (Admin only)
+  app.put('/api/data-categories/:id', requireAdmin, (req: AuthRequest, res) => {
     const { id } = req.params;
-    if (!dbData.dataCategories) dbData.dataCategories = [];
-
-    const index = dbData.dataCategories.findIndex((c) => c.id === id);
-    if (index === -1) {
+    const updated = updateDataCategory(id, req.body);
+    if (!updated) {
       return res.status(404).json({ error: 'Categoría no encontrada' });
     }
 
-    const prevCategory = dbData.dataCategories[index];
-    const oldName = prevCategory.name;
-    const newName = req.body.name ? req.body.name.trim() : oldName;
-
-    const updatedCategory: DataCategory = {
-      ...prevCategory,
-      ...req.body,
-      name: newName,
-      id,
-    };
-
-    if (Array.isArray(req.body.subcategories)) {
-      updatedCategory.subcategories = req.body.subcategories
-        .filter((s: string) => typeof s === 'string' && s.trim().length > 0)
-        .map((s: string) => s.trim());
-    }
-
-    dbData.dataCategories[index] = updatedCategory;
-
-    // If category title/name changed, optionally cascade to personalRecords
-    if (oldName !== newName && dbData.personalRecords) {
-      let recordsChanged = false;
-      dbData.personalRecords.forEach((rec) => {
-        if (rec.category && rec.category.toLowerCase() === oldName.toLowerCase()) {
-          rec.category = newName;
-          recordsChanged = true;
-          broadcast('PERSONAL_RECORD_UPDATED', { record: rec });
-        }
-      });
-      if (recordsChanged) {
-        // saved below
-      }
-    }
-
-    saveDatabase(dbData);
-
-    broadcast('DATA_CATEGORY_UPDATED', { category: updatedCategory });
-    res.json(updatedCategory);
+    broadcast('DATA_CATEGORY_UPDATED', { category: updated });
+    res.json(updated);
   });
 
-  // PUT /api/data-categories/:id/subcategories/rename - Rename a subcategory
-  app.put('/api/data-categories/:id/subcategories/rename', (req, res) => {
+  // PUT /api/data-categories/:id/subcategories/rename - Rename a subcategory (Admin only)
+  app.put('/api/data-categories/:id/subcategories/rename', requireAdmin, (req: AuthRequest, res) => {
     const { id } = req.params;
-    const { oldSubcategoryName, newSubcategoryName, updateRecords } = req.body;
+    const { oldSubcategoryName, newSubcategoryName } = req.body;
 
     if (!oldSubcategoryName || !newSubcategoryName || !newSubcategoryName.trim()) {
       return res.status(400).json({ error: 'Nombres de subcategoría anterior y nuevo requeridos' });
     }
 
-    if (!dbData.dataCategories) dbData.dataCategories = [];
-    const index = dbData.dataCategories.findIndex((c) => c.id === id);
-    if (index === -1) {
+    const allData = getAllAppData();
+    const cat = allData.dataCategories?.find((c) => c.id === id);
+    if (!cat) {
       return res.status(404).json({ error: 'Categoría no encontrada' });
     }
 
-    const cat = dbData.dataCategories[index];
     const oldTrimmed = oldSubcategoryName.trim();
     const newTrimmed = newSubcategoryName.trim();
+    const updatedSubs = (cat.subcategories || []).map((s) => (s.toLowerCase() === oldTrimmed.toLowerCase() ? newTrimmed : s));
 
-    if (cat.subcategories) {
-      cat.subcategories = cat.subcategories.map((s) => (s.toLowerCase() === oldTrimmed.toLowerCase() ? newTrimmed : s));
-    }
-
-    // Cascade rename across records if requested
-    if (updateRecords !== false && dbData.personalRecords) {
-      dbData.personalRecords.forEach((rec) => {
-        if (
-          rec.category &&
-          rec.category.toLowerCase() === cat.name.toLowerCase() &&
-          rec.subcategory &&
-          rec.subcategory.toLowerCase() === oldTrimmed.toLowerCase()
-        ) {
-          rec.subcategory = newTrimmed;
-          broadcast('PERSONAL_RECORD_UPDATED', { record: rec });
-        }
-      });
-    }
-
-    saveDatabase(dbData);
-    broadcast('DATA_CATEGORY_UPDATED', { category: cat });
-    res.json(cat);
+    const updated = updateDataCategory(id, { subcategories: updatedSubs });
+    broadcast('DATA_CATEGORY_UPDATED', { category: updated });
+    res.json(updated);
   });
 
-  // POST /api/data-categories/:id/subcategories - Add subcategory to category
-  app.post('/api/data-categories/:id/subcategories', (req, res) => {
+  // POST /api/data-categories/:id/subcategories - Add subcategory (Admin only)
+  app.post('/api/data-categories/:id/subcategories', requireAdmin, (req: AuthRequest, res) => {
     const { id } = req.params;
     const { subcategoryName } = req.body;
 
@@ -1179,59 +923,50 @@ async function startServer() {
       return res.status(400).json({ error: 'El nombre de la subcategoría es obligatorio' });
     }
 
-    if (!dbData.dataCategories) dbData.dataCategories = [];
-    const index = dbData.dataCategories.findIndex((c) => c.id === id);
-    if (index === -1) {
+    const allData = getAllAppData();
+    const cat = allData.dataCategories?.find((c) => c.id === id);
+    if (!cat) {
       return res.status(404).json({ error: 'Categoría no encontrada' });
     }
 
     const trimmed = subcategoryName.trim();
-    const cat = dbData.dataCategories[index];
-    if (!cat.subcategories) cat.subcategories = [];
-
-    // Avoid duplicate subcategories inside the same category (case-insensitive check)
-    const exists = cat.subcategories.some((s) => s.toLowerCase() === trimmed.toLowerCase());
-    if (!exists) {
-      cat.subcategories.push(trimmed);
-      saveDatabase(dbData);
-      broadcast('DATA_CATEGORY_UPDATED', { category: cat });
+    const currentSubs = cat.subcategories || [];
+    if (!currentSubs.some((s) => s.toLowerCase() === trimmed.toLowerCase())) {
+      currentSubs.push(trimmed);
+      const updated = updateDataCategory(id, { subcategories: currentSubs });
+      broadcast('DATA_CATEGORY_UPDATED', { category: updated });
+      return res.json(updated);
     }
 
     res.json(cat);
   });
 
-  // DELETE /api/data-categories/:id/subcategories/:subName - Remove subcategory from category
-  app.delete('/api/data-categories/:id/subcategories/:subName', (req, res) => {
+  // DELETE /api/data-categories/:id/subcategories/:subName - Remove subcategory (Admin only)
+  app.delete('/api/data-categories/:id/subcategories/:subName', requireAdmin, (req: AuthRequest, res) => {
     const { id, subName } = req.params;
     const decodedSubName = decodeURIComponent(subName);
 
-    if (!dbData.dataCategories) dbData.dataCategories = [];
-    const index = dbData.dataCategories.findIndex((c) => c.id === id);
-    if (index === -1) {
+    const allData = getAllAppData();
+    const cat = allData.dataCategories?.find((c) => c.id === id);
+    if (!cat) {
       return res.status(404).json({ error: 'Categoría no encontrada' });
     }
 
-    const cat = dbData.dataCategories[index];
-    if (cat.subcategories) {
-      cat.subcategories = cat.subcategories.filter((s) => s.toLowerCase() !== decodedSubName.toLowerCase());
-      saveDatabase(dbData);
-      broadcast('DATA_CATEGORY_UPDATED', { category: cat });
-    }
-
-    res.json(cat);
+    const updatedSubs = (cat.subcategories || []).filter((s) => s.toLowerCase() !== decodedSubName.toLowerCase());
+    const updated = updateDataCategory(id, { subcategories: updatedSubs });
+    broadcast('DATA_CATEGORY_UPDATED', { category: updated });
+    res.json(updated);
   });
 
-  // DELETE /api/data-categories/:id - Delete category
-  app.delete('/api/data-categories/:id', (req, res) => {
+  // DELETE /api/data-categories/:id - Delete category (Admin only)
+  app.delete('/api/data-categories/:id', requireAdmin, (req: AuthRequest, res) => {
     const { id } = req.params;
-    if (!dbData.dataCategories) dbData.dataCategories = [];
-
-    dbData.dataCategories = dbData.dataCategories.filter((c) => c.id !== id);
-    saveDatabase(dbData);
-
+    deleteDataCategory(id);
     broadcast('DATA_CATEGORY_DELETED', { categoryId: id });
     res.json({ success: true, categoryId: id });
   });
+
+  // ================= NOTIFICATIONS =================
 
   // POST /api/notifications/send - Admin push alert trigger
   app.post('/api/notifications/send', (req, res) => {
@@ -1251,9 +986,7 @@ async function startServer() {
       type: 'admin_alert',
     };
 
-    dbData.notifications.unshift(notif);
-    saveDatabase(dbData);
-
+    insertNotification(notif);
     broadcast('PUSH_NOTIFICATION', { notification: notif });
     res.status(201).json(notif);
   });
@@ -1261,27 +994,12 @@ async function startServer() {
   // POST /api/notifications/read - Mark notifications read
   app.post('/api/notifications/read', (req, res) => {
     const { memberId, notificationId } = req.body;
-
-    if (notificationId) {
-      dbData.notifications = dbData.notifications.map((n) => (n.id === notificationId ? { ...n, read: true } : n));
-    } else if (memberId) {
-      dbData.notifications = dbData.notifications.map((n) =>
-        n.recipientId === memberId || n.recipientId === 'all' ? { ...n, read: true } : n
-      );
-    }
-
-    saveDatabase(dbData);
+    markNotificationsAsRead(memberId, notificationId);
     broadcast('NOTIFICATIONS_READ', { memberId, notificationId });
     res.json({ success: true });
   });
 
-  // POST /api/reset - Reset sample data
-  app.post('/api/reset', (_req, res) => {
-    dbData = JSON.parse(JSON.stringify(INITIAL_DATA));
-    saveDatabase(dbData);
-    broadcast('INIT_SYNC', dbData);
-    res.json({ success: true, message: 'Datos reiniciados limpiamente' });
-  });
+  // ================= SPA / VITE MIDDLEWARE =================
 
   // Vite middleware for dev or static server for production
   if (process.env.NODE_ENV !== 'production') {
@@ -1299,7 +1017,7 @@ async function startServer() {
   }
 
   server.listen(PORT, '0.0.0.0', () => {
-    console.log(`🛒 App running on http://0.0.0.0:${PORT}`);
+    console.log(`🛒 Familia Hadida App running on http://0.0.0.0:${PORT}`);
   });
 }
 

@@ -247,29 +247,40 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
                   );
                 })}
 
-                {/* Quick Button to Add New Category - matching the red + square icon style */}
-                <button
-                  onClick={onOpenManageCategories}
-                  className="w-7 h-7 rounded-xl bg-white dark:bg-slate-900 text-red-600 border border-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center justify-center cursor-pointer transition-all shadow-2xs shrink-0"
-                  title="Gestionar y agregar categorías"
-                  aria-label="Agregar o gestionar categorías"
-                >
-                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                </button>
+                {/* Quick Button to Add New Category (Admin Only) */}
+                {isAdmin && (
+                  <button
+                    onClick={onOpenManageCategories}
+                    className="w-7 h-7 rounded-xl bg-white dark:bg-slate-900 text-red-600 border border-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center justify-center cursor-pointer transition-all shadow-2xs shrink-0"
+                    title="Gestionar y agregar categorías"
+                    aria-label="Agregar o gestionar categorías"
+                  >
+                    <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                  </button>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Right side: Action Buttons (Only Icons) Stacked One Above the Other */}
+          {/* Right side: Action Buttons */}
           <div className="flex flex-row md:flex-col items-center justify-end gap-2 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 md:border-l border-slate-100 dark:border-slate-800 md:pl-4">
-            <button
-              onClick={() => onOpenAddRecord()}
-              className="w-9 h-9 rounded-xl bg-white dark:bg-slate-900 text-red-600 border border-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center justify-center cursor-pointer transition-all shadow-2xs"
-              title="Adjuntar / Agregar dato"
-              aria-label="Adjuntar dato"
-            >
-              <Plus className="w-4 h-4 stroke-[2.5]" />
-            </button>
+            {isAdmin ? (
+              <button
+                onClick={() => onOpenAddRecord()}
+                className="w-9 h-9 rounded-xl bg-white dark:bg-slate-900 text-red-600 border border-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center justify-center cursor-pointer transition-all shadow-2xs"
+                title="Adjuntar / Agregar dato o documento (Admin)"
+                aria-label="Adjuntar dato"
+              >
+                <Plus className="w-4 h-4 stroke-[2.5]" />
+              </button>
+            ) : (
+              <div
+                className="hidden md:flex flex-col items-center justify-center px-2 py-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-[10px] text-slate-500 text-center max-w-[90px]"
+                title="Solo el administrador (Jaime) puede subir o eliminar documentos"
+              >
+                <span>🔒 Solo lectura</span>
+              </div>
+            )}
 
             {records.length > 0 && (
               <button

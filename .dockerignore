@@ -5,3 +5,6 @@ dist
 .env
 bun.lock
 *.log
+database.sqlite*
+uploads
+

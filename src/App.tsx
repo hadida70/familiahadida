@@ -41,6 +41,10 @@ export default function App() {
     connected,
     activeMember,
     setActiveMember,
+    token,
+    login,
+    logout,
+    uploadFile,
     addItem,
     updateItem,
     deleteItem,
@@ -79,7 +83,7 @@ export default function App() {
 
   // Authentication & Role State
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return localStorage.getItem('hadida_family_auth') === 'authenticated';
+    return localStorage.getItem('hadida_family_auth') === 'authenticated' && !!localStorage.getItem('hadida_family_auth_token');
   });
 
   const [authRole, setAuthRole] = useState<'admin' | 'member'>(() => {
@@ -161,8 +165,7 @@ export default function App() {
 
   // Lock and return to PinLockScreen
   const handleLock = () => {
-    localStorage.removeItem('hadida_family_auth');
-    localStorage.removeItem('hadida_family_auth_member_id');
+    logout();
     setIsAuthenticated(false);
   };
 
@@ -291,6 +294,7 @@ export default function App() {
       <PinLockScreen
         members={data.members}
         onUnlock={handleUnlock}
+        onLogin={login}
         initialMember={activeMember}
       />
     );
@@ -639,6 +643,7 @@ export default function App() {
           setAddRecordPreset(null);
         }}
         onSave={handleSavePersonalRecord}
+        onUploadFile={uploadFile}
         members={data.members}
         activeMember={activeMember}
         editingRecord={editingPersonalRecord}

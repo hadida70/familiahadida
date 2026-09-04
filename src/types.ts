@@ -11,11 +11,18 @@ export interface CustomList {
 export interface Member {
   id: string;
   name: string;
+  username?: string;
+  pin?: string;
   role: 'admin' | 'member';
   avatarColor: string;
   avatarInitial: string;
   iconName?: string;
   createdAt?: string;
+}
+
+export interface AuthSession {
+  token: string;
+  user: Member;
 }
 
 export interface GroceryItem {
@@ -44,7 +51,8 @@ export interface PersonalRecord {
   fileName?: string;
   fileType?: string;
   fileSize?: number;
-  fileDataUrl?: string; // base64 / data URL
+  fileUrl?: string; // Path or URL to download/view the uploaded file
+  fileDataUrl?: string; // base64 / data URL for preview fallback
 
   // Credit / Debit Card specific fields
   cardNumber?: string;       // e.g. "4580 9811 3659 9900"

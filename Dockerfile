@@ -22,6 +22,8 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV DATABASE_URL=/app/data/database.sqlite
+ENV UPLOADS_DIR=/app/data/uploads
 ENV DB_FILE=/app/data/groceries_db.json
 
 # Instalar solo dependencias de producción

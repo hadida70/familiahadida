@@ -18,13 +18,17 @@ interface UseWebSocketReturn {
   connected: boolean;
   activeMember: Member | null;
   setActiveMember: (member: Member) => void;
+  token: string | null;
+  login: (memberIdOrUsername: string, pin: string) => Promise<{ success: boolean; error?: string; user?: Member }>;
+  logout: () => void;
+  uploadFile: (file: File) => Promise<{ fileName: string; fileUrl: string; fileType: string; fileSize: number } | null>;
   addItem: (item: Partial<GroceryItem>) => Promise<void>;
   updateItem: (id: string, updates: Partial<GroceryItem>) => Promise<void>;
   deleteItem: (id: string) => Promise<void>;
   createList: (list: Partial<CustomList>) => Promise<void>;
   updateList: (id: string, updates: Partial<CustomList>) => Promise<void>;
   deleteList: (id: string) => Promise<void>;
-  addMember: (member: Partial<Member>) => Promise<void>;
+  addMember: (member: Partial<Member> & { pin?: string }) => Promise<void>;
   deleteMember: (id: string) => Promise<void>;
   addPersonalRecord: (record: Partial<PersonalRecord>) => Promise<void>;
   updatePersonalRecord: (id: string, updates: Partial<PersonalRecord>) => Promise<void>;
@@ -67,6 +71,9 @@ export function useWebSocket(): UseWebSocketReturn {
   });
   const [connected, setConnected] = useState(false);
   const [activeMember, setActiveMemberState] = useState<Member | null>(null);
+  const [token, setToken] = useState<string | null>(() => {
+    return localStorage.getItem('hadida_family_auth_token') || null;
+  });
   const [recentToast, setRecentToast] = useState<PushNotification | null>(null);
   const [pushPermission, setPushPermission] = useState<NotificationPermission>(
     typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'default'
@@ -79,6 +86,17 @@ export function useWebSocket(): UseWebSocketReturn {
   useEffect(() => {
     activeMemberRef.current = activeMember;
   }, [activeMember]);
+
+  const getAuthHeaders = useCallback((): HeadersInit => {
+    const currentToken = token || localStorage.getItem('hadida_family_auth_token');
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (currentToken) {
+      headers['Authorization'] = `Bearer ${currentToken}`;
+    }
+    return headers;
+  }, [token]);
 
   // Request browser Web Notification permissions
   const requestPushPermission = async (): Promise<NotificationPermission> => {
@@ -111,7 +129,9 @@ export function useWebSocket(): UseWebSocketReturn {
   // Fetch initial REST backup data
   const fetchFullData = useCallback(async () => {
     try {
-      const res = await fetch('/api/data');
+      const res = await fetch('/api/data', {
+        headers: getAuthHeaders(),
+      });
       if (res.ok) {
         const json: AppData = await res.json();
         if (!json.lists) json.lists = [];
@@ -121,7 +141,7 @@ export function useWebSocket(): UseWebSocketReturn {
         setData(json);
 
         // Restore active member if saved or pick default
-        const savedMemberId = localStorage.getItem('supermercado_active_member');
+        const savedMemberId = localStorage.getItem('hadida_family_auth_member_id') || localStorage.getItem('supermercado_active_member');
         if (savedMemberId) {
           const found = json.members.find((m) => m.id === savedMemberId);
           if (found) {
@@ -129,14 +149,14 @@ export function useWebSocket(): UseWebSocketReturn {
             return;
           }
         }
-        if (json.members.length > 0) {
+        if (json.members.length > 0 && !activeMemberRef.current) {
           setActiveMemberState(json.members[0]);
         }
       }
     } catch (err) {
       console.error('Error fetching initial data:', err);
     }
-  }, []);
+  }, [getAuthHeaders]);
 
   // Establish WebSocket connection with auto-reconnect
   useEffect(() => {
@@ -182,8 +202,8 @@ export function useWebSocket(): UseWebSocketReturn {
                 todos: msg.payload.todos || [],
                 notifications: msg.payload.notifications || [],
               });
-              if (!activeMemberRef.current && msg.payload.members.length > 0) {
-                const savedId = localStorage.getItem('supermercado_active_member');
+              if (!activeMemberRef.current && msg.payload.members && msg.payload.members.length > 0) {
+                const savedId = localStorage.getItem('hadida_family_auth_member_id') || localStorage.getItem('supermercado_active_member');
                 const matched = msg.payload.members.find((m: Member) => m.id === savedId) || msg.payload.members[0];
                 setActiveMemberState(matched);
               }
@@ -221,7 +241,6 @@ export function useWebSocket(): UseWebSocketReturn {
                   : prev.notifications,
               }));
 
-              // Trigger alert if assigned to active member
               if (
                 msg.payload.notification &&
                 currentMember &&
@@ -278,7 +297,7 @@ export function useWebSocket(): UseWebSocketReturn {
                 personalRecords: (prev.personalRecords || []).filter((r) => r.memberId !== msg.payload.memberId),
               }));
               if (currentMember && currentMember.id === msg.payload.memberId) {
-                setActiveMemberState((prevData) => data.members[0] || null);
+                setActiveMemberState(data.members[0] || null);
               }
               break;
 
@@ -471,17 +490,86 @@ export function useWebSocket(): UseWebSocketReturn {
 
   const setActiveMember = (member: Member) => {
     setActiveMemberState(member);
+    localStorage.setItem('hadida_family_auth_member_id', member.id);
     localStorage.setItem('supermercado_active_member', member.id);
+  };
+
+  // Auth Functions
+  const login = async (memberIdOrUsername: string, pin: string) => {
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ memberId: memberIdOrUsername, pin }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) {
+        return { success: false, error: json.error || 'Error al iniciar sesión' };
+      }
+
+      setToken(json.token);
+      localStorage.setItem('hadida_family_auth_token', json.token);
+      localStorage.setItem('hadida_family_auth', 'authenticated');
+      localStorage.setItem('hadida_family_auth_role', json.user.role);
+      localStorage.setItem('hadida_family_auth_member_id', json.user.id);
+      setActiveMemberState(json.user);
+
+      // Refresh data
+      fetchFullData();
+
+      return { success: true, user: json.user };
+    } catch (err) {
+      console.error('Login error:', err);
+      return { success: false, error: 'No se pudo conectar con el servidor.' };
+    }
+  };
+
+  const logout = () => {
+    setToken(null);
+    localStorage.removeItem('hadida_family_auth_token');
+    localStorage.removeItem('hadida_family_auth');
+    localStorage.removeItem('hadida_family_auth_role');
+  };
+
+  // Upload file helper
+  const uploadFile = async (file: File) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const currentToken = token || localStorage.getItem('hadida_family_auth_token');
+      const headers: Record<string, string> = {};
+      if (currentToken) {
+        headers['Authorization'] = `Bearer ${currentToken}`;
+      }
+
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json();
+        throw new Error(errJson.error || 'Error al subir archivo');
+      }
+
+      return await res.json();
+    } catch (err) {
+      console.error('File upload error:', err);
+      return null;
+    }
   };
 
   const createList = async (list: Partial<CustomList>) => {
     try {
       await fetch('/api/lists', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           ...list,
-          createdBy: activeMember ? activeMember.id : 'admin_1',
+          createdBy: activeMember ? activeMember.id : 'member_jaime',
         }),
       });
     } catch (err) {
@@ -493,7 +581,7 @@ export function useWebSocket(): UseWebSocketReturn {
     try {
       await fetch(`/api/lists/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(updates),
       });
     } catch (err) {
@@ -503,7 +591,10 @@ export function useWebSocket(): UseWebSocketReturn {
 
   const deleteList = async (id: string) => {
     try {
-      await fetch(`/api/lists/${id}`, { method: 'DELETE' });
+      await fetch(`/api/lists/${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
     } catch (err) {
       console.error('Error deleting list:', err);
     }
@@ -513,10 +604,10 @@ export function useWebSocket(): UseWebSocketReturn {
     try {
       await fetch('/api/items', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           ...item,
-          createdBy: activeMember ? activeMember.id : 'admin_1',
+          createdBy: activeMember ? activeMember.id : 'member_jaime',
         }),
       });
     } catch (err) {
@@ -528,7 +619,7 @@ export function useWebSocket(): UseWebSocketReturn {
     try {
       await fetch(`/api/items/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(updates),
       });
     } catch (err) {
@@ -538,17 +629,20 @@ export function useWebSocket(): UseWebSocketReturn {
 
   const deleteItem = async (id: string) => {
     try {
-      await fetch(`/api/items/${id}`, { method: 'DELETE' });
+      await fetch(`/api/items/${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
     } catch (err) {
       console.error('Error deleting item:', err);
     }
   };
 
-  const addMember = async (member: Partial<Member>) => {
+  const addMember = async (member: Partial<Member> & { pin?: string }) => {
     try {
-      await fetch('/api/members', {
+      await fetch('/api/auth/users', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(member),
       });
     } catch (err) {
@@ -558,7 +652,10 @@ export function useWebSocket(): UseWebSocketReturn {
 
   const deleteMember = async (id: string) => {
     try {
-      await fetch(`/api/members/${id}`, { method: 'DELETE' });
+      await fetch(`/api/auth/users/${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
     } catch (err) {
       console.error('Error deleting member:', err);
     }
@@ -568,7 +665,7 @@ export function useWebSocket(): UseWebSocketReturn {
     try {
       await fetch('/api/personal-records', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(record),
       });
     } catch (err) {
@@ -580,7 +677,7 @@ export function useWebSocket(): UseWebSocketReturn {
     try {
       await fetch(`/api/personal-records/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(updates),
       });
     } catch (err) {
@@ -590,7 +687,10 @@ export function useWebSocket(): UseWebSocketReturn {
 
   const deletePersonalRecord = async (id: string) => {
     try {
-      await fetch(`/api/personal-records/${id}`, { method: 'DELETE' });
+      await fetch(`/api/personal-records/${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
     } catch (err) {
       console.error('Error deleting personal record:', err);
     }
@@ -600,11 +700,11 @@ export function useWebSocket(): UseWebSocketReturn {
     try {
       await fetch('/api/data-categories', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(category),
       });
     } catch (err) {
-      console.error('Error adding data category:', err);
+      console.error('Error adding category:', err);
     }
   };
 
@@ -612,19 +712,22 @@ export function useWebSocket(): UseWebSocketReturn {
     try {
       await fetch(`/api/data-categories/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(updates),
       });
     } catch (err) {
-      console.error('Error updating data category:', err);
+      console.error('Error updating category:', err);
     }
   };
 
   const deleteDataCategory = async (id: string) => {
     try {
-      await fetch(`/api/data-categories/${id}`, { method: 'DELETE' });
+      await fetch(`/api/data-categories/${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
     } catch (err) {
-      console.error('Error deleting data category:', err);
+      console.error('Error deleting category:', err);
     }
   };
 
@@ -632,7 +735,7 @@ export function useWebSocket(): UseWebSocketReturn {
     try {
       await fetch(`/api/data-categories/${categoryId}/subcategories`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ subcategoryName }),
       });
     } catch (err) {
@@ -649,7 +752,7 @@ export function useWebSocket(): UseWebSocketReturn {
     try {
       await fetch(`/api/data-categories/${categoryId}/subcategories/rename`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ oldSubcategoryName, newSubcategoryName, updateRecords }),
       });
     } catch (err) {
@@ -661,6 +764,7 @@ export function useWebSocket(): UseWebSocketReturn {
     try {
       await fetch(`/api/data-categories/${categoryId}/subcategories/${encodeURIComponent(subcategoryName)}`, {
         method: 'DELETE',
+        headers: getAuthHeaders(),
       });
     } catch (err) {
       console.error('Error deleting subcategory:', err);
@@ -671,7 +775,7 @@ export function useWebSocket(): UseWebSocketReturn {
     try {
       await fetch('/api/tasks', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(task),
       });
     } catch (err) {
@@ -683,7 +787,7 @@ export function useWebSocket(): UseWebSocketReturn {
     try {
       await fetch(`/api/tasks/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(updates),
       });
     } catch (err) {
@@ -693,7 +797,10 @@ export function useWebSocket(): UseWebSocketReturn {
 
   const deleteTask = async (id: string) => {
     try {
-      await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+      await fetch(`/api/tasks/${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
     } catch (err) {
       console.error('Error deleting task:', err);
     }
@@ -703,7 +810,7 @@ export function useWebSocket(): UseWebSocketReturn {
     try {
       await fetch('/api/contacts', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(contact),
       });
     } catch (err) {
@@ -715,7 +822,7 @@ export function useWebSocket(): UseWebSocketReturn {
     try {
       await fetch(`/api/contacts/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(updates),
       });
     } catch (err) {
@@ -725,7 +832,10 @@ export function useWebSocket(): UseWebSocketReturn {
 
   const deleteContact = async (id: string) => {
     try {
-      await fetch(`/api/contacts/${id}`, { method: 'DELETE' });
+      await fetch(`/api/contacts/${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
     } catch (err) {
       console.error('Error deleting contact:', err);
     }
@@ -735,7 +845,7 @@ export function useWebSocket(): UseWebSocketReturn {
     try {
       await fetch('/api/todos', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(todo),
       });
     } catch (err) {
@@ -747,7 +857,7 @@ export function useWebSocket(): UseWebSocketReturn {
     try {
       await fetch(`/api/todos/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(updates),
       });
     } catch (err) {
@@ -757,7 +867,10 @@ export function useWebSocket(): UseWebSocketReturn {
 
   const deleteTodo = async (id: string) => {
     try {
-      await fetch(`/api/todos/${id}`, { method: 'DELETE' });
+      await fetch(`/api/todos/${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
     } catch (err) {
       console.error('Error deleting todo:', err);
     }
@@ -765,7 +878,10 @@ export function useWebSocket(): UseWebSocketReturn {
 
   const clearCompletedTodos = async () => {
     try {
-      await fetch('/api/todos/clear-completed', { method: 'POST' });
+      await fetch('/api/todos/clear-completed', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      });
     } catch (err) {
       console.error('Error clearing completed todos:', err);
     }
@@ -775,11 +891,11 @@ export function useWebSocket(): UseWebSocketReturn {
     try {
       await fetch('/api/notifications/send', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ recipientId, title, message }),
       });
     } catch (err) {
-      console.error('Error sending push alert:', err);
+      console.error('Error sending alert:', err);
     }
   };
 
@@ -787,20 +903,27 @@ export function useWebSocket(): UseWebSocketReturn {
     try {
       await fetch('/api/notifications/read', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ memberId, notificationId }),
       });
     } catch (err) {
-      console.error('Error marking notifications as read:', err);
+      console.error('Error marking notifications read:', err);
     }
   };
 
   const resetDemoData = async () => {
     try {
-      await fetch('/api/reset', { method: 'POST' });
+      await fetch('/api/reset', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      });
     } catch (err) {
-      console.error('Error resetting demo data:', err);
+      console.error('Error resetting data:', err);
     }
+  };
+
+  const clearToast = () => {
+    setRecentToast(null);
   };
 
   return {
@@ -808,6 +931,10 @@ export function useWebSocket(): UseWebSocketReturn {
     connected,
     activeMember,
     setActiveMember,
+    token,
+    login,
+    logout,
+    uploadFile,
     addItem,
     updateItem,
     deleteItem,
@@ -839,7 +966,7 @@ export function useWebSocket(): UseWebSocketReturn {
     markNotificationsRead,
     resetDemoData,
     recentToast,
-    clearToast: () => setRecentToast(null),
+    clearToast,
     requestPushPermission,
     pushPermission,
   };

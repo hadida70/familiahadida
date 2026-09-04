@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, UserPlus, User, Shield } from 'lucide-react';
+import { X, UserPlus, User, Shield, KeyRound } from 'lucide-react';
 import { Member } from '../types';
 
 interface AddMemberModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddMember: (member: Partial<Member>) => void;
+  onAddMember: (member: Partial<Member> & { pin?: string }) => void;
 }
 
 export const AddMemberModal: React.FC<AddMemberModalProps> = ({
@@ -15,8 +15,9 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
   onAddMember,
 }) => {
   const [name, setName] = useState('');
+  const [pin, setPin] = useState('1474');
   const [role, setRole] = useState<'admin' | 'member'>('member');
-  const [color, setColor] = useState('bg-red-600');
+  const [color, setColor] = useState('bg-blue-600');
 
   if (!isOpen) return null;
 
@@ -37,12 +38,14 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
 
     onAddMember({
       name: name.trim().toUpperCase(),
+      pin: pin.trim() || '1474',
       role,
       avatarColor: color,
-      avatarInitial: '👤',
+      avatarInitial: name.trim()[0]?.toUpperCase() || '👤',
     });
 
     setName('');
+    setPin('1474');
     onClose();
   };
 
@@ -81,10 +84,31 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Ej. JAIME, SOFI, SIMON..."
+                placeholder="Ej. SOFI, STEPHANIE, MOISES..."
                 required
                 className="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-red-500 text-slate-900 dark:text-white font-medium text-base outline-none"
               />
+            </div>
+
+            {/* PIN Input */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                <KeyRound className="w-3.5 h-3.5 text-amber-500" />
+                PIN de acceso (mínimo 4 dígitos)
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={8}
+                value={pin}
+                onChange={(e) => setPin(e.target.value.replace(/[^0-9]/g, ''))}
+                placeholder="1474"
+                required
+                className="w-full px-4 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-red-500 text-slate-900 dark:text-white font-mono font-bold text-base outline-none tracking-widest text-center"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">
+                Predeterminado: <strong>1474</strong>. El usuario usará este PIN para iniciar sesión.
+              </p>
             </div>
 
             {/* Role Radio */}
@@ -98,14 +122,14 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
                   onClick={() => setRole('member')}
                   className={`p-3 rounded-2xl border text-left flex items-center gap-2 transition-all cursor-pointer ${
                     role === 'member'
-                      ? 'bg-white dark:bg-slate-900 text-red-600 border-red-600 font-bold shadow-xs'
+                      ? 'bg-white dark:bg-slate-900 text-blue-600 border-blue-600 font-bold shadow-xs ring-1 ring-blue-500/20'
                       : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
                   }`}
                 >
-                  <User className="w-4 h-4" />
+                  <User className="w-4 h-4 text-blue-500" />
                   <div className="flex flex-col">
                     <span className="text-xs">Integrante</span>
-                    <span className="text-[10px] opacity-80">Ve y marca productos</span>
+                    <span className="text-[10px] opacity-80">Listas y consulta de docs</span>
                   </div>
                 </button>
 
@@ -114,14 +138,14 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
                   onClick={() => setRole('admin')}
                   className={`p-3 rounded-2xl border text-left flex items-center gap-2 transition-all cursor-pointer ${
                     role === 'admin'
-                      ? 'bg-white dark:bg-slate-900 text-red-600 border-red-600 font-bold shadow-xs'
+                      ? 'bg-white dark:bg-slate-900 text-amber-600 border-amber-600 font-bold shadow-xs ring-1 ring-amber-500/20'
                       : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
                   }`}
                 >
-                  <Shield className="w-4 h-4" />
+                  <Shield className="w-4 h-4 text-amber-500" />
                   <div className="flex flex-col">
                     <span className="text-xs">Administrador</span>
-                    <span className="text-[10px] opacity-80">Control total</span>
+                    <span className="text-[10px] opacity-80">Gestión total y subida de docs</span>
                   </div>
                 </button>
               </div>
