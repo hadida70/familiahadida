@@ -24,7 +24,7 @@ services:
         if [ ! -d /app/repo/.git ]; then
           git clone https://github.com/hadida70/familiahadida.git /app/repo
         else
-          cd /app/repo && git pull
+          cd /app/repo && git fetch origin && git reset --hard origin/main
         fi &&
         cd /app/repo &&
         npm install &&
