@@ -67,6 +67,7 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
   const [category, setCategory] = useState<string>('');
   const [subcategory, setSubcategory] = useState<string>('');
   const [isCustomCategory, setIsCustomCategory] = useState(false);
+  const [isCustomSubcategory, setIsCustomSubcategory] = useState(false);
   const [newSubInline, setNewSubInline] = useState('');
   const [showNewSubInput, setShowNewSubInput] = useState(false);
 
@@ -125,6 +126,11 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
         (c) => c.name.toLowerCase() === (editingRecord.category || '').toLowerCase()
       );
       setIsCustomCategory(!isKnown && !!editingRecord.category);
+
+      const catObj = categories.find((c) => c.name.toLowerCase() === (editingRecord.category || '').toLowerCase());
+      const isKnownSub = catObj?.subcategories?.some((s) => s.toLowerCase() === (editingRecord.subcategory || '').toLowerCase());
+      setIsCustomSubcategory(!isKnownSub && !!editingRecord.subcategory);
+
       setIsCardMode(isCardSubcategory(editingRecord.category || '', editingRecord.subcategory || '', editingRecord));
     } else {
       const activeId = activeMember?.id || members[0]?.id || 'member_jaime';
@@ -156,6 +162,7 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
       setCategory(targetCat);
       setSubcategory(targetSub);
       setIsCustomCategory(false);
+      setIsCustomSubcategory(false);
       setFileName('');
       setFileType('');
       setFileSize(0);
@@ -183,16 +190,29 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
     const val = e.target.value;
     if (val === '__custom__') {
       setIsCustomCategory(true);
+      setIsCustomSubcategory(true);
       setCategory('');
       setSubcategory('');
       setIsCardMode(false);
     } else {
       setIsCustomCategory(false);
+      setIsCustomSubcategory(false);
       setCategory(val);
       const catObj = categories.find((c) => c.name === val);
       const firstSub = catObj?.subcategories?.[0] || '';
       setSubcategory(firstSub);
       setIsCardMode(isCardSubcategory(val, firstSub));
+    }
+  };
+
+  const handleSubcategorySelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    if (val === '__custom__') {
+      setIsCustomSubcategory(true);
+      handleSubcategorySelect('');
+    } else {
+      setIsCustomSubcategory(false);
+      handleSubcategorySelect(val);
     }
   };
 
@@ -212,6 +232,7 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
     if (selectedCategoryObj && onAddSubcategory) {
       await onAddSubcategory(selectedCategoryObj.id, trimmed);
     }
+    setIsCustomSubcategory(false);
     handleSubcategorySelect(trimmed);
     setNewSubInline('');
     setShowNewSubInput(false);
@@ -503,40 +524,51 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
                 )}
               </div>
 
-              <input
-                type="text"
-                required
-                value={subcategory}
-                onChange={(e) => handleSubcategorySelect(e.target.value)}
-                placeholder="Ej: Tarjeta de Crédito, Cédula..."
-                className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-red-500/30 focus:border-red-500 transition-all"
-              />
+              {availableSubcategories.length > 0 && !isCustomCategory ? (
+                <div className="relative">
+                  <select
+                    value={
+                      isCustomSubcategory
+                        ? '__custom__'
+                        : availableSubcategories.some((s) => s.toLowerCase() === subcategory.toLowerCase())
+                        ? availableSubcategories.find((s) => s.toLowerCase() === subcategory.toLowerCase()) || subcategory
+                        : availableSubcategories[0] || ''
+                    }
+                    onChange={handleSubcategorySelectChange}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-red-500/30 focus:border-red-500 transition-all appearance-none cursor-pointer"
+                  >
+                    {availableSubcategories.map((sub) => (
+                      <option key={sub} value={sub}>
+                        {sub}
+                      </option>
+                    ))}
+                    <option value="__custom__">➕ Otra subcategoría...</option>
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+              ) : (
+                <input
+                  type="text"
+                  required
+                  value={subcategory}
+                  onChange={(e) => handleSubcategorySelect(e.target.value)}
+                  placeholder="Ej: Tarjeta de Crédito, Cédula..."
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-red-500/30 focus:border-red-500 transition-all"
+                />
+              )}
+
+              {isCustomSubcategory && availableSubcategories.length > 0 && !isCustomCategory && (
+                <input
+                  type="text"
+                  required
+                  value={subcategory}
+                  onChange={(e) => handleSubcategorySelect(e.target.value)}
+                  placeholder="Nombre de la subcategoría..."
+                  className="w-full mt-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-red-300 dark:border-red-800 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-red-500/30"
+                />
+              )}
             </div>
           </div>
-
-          {/* Quick Subcategory Chips */}
-          {availableSubcategories.length > 0 && !isCustomCategory && (
-            <div className="flex flex-wrap gap-1.5 p-1.5 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-100 dark:border-slate-800 max-h-24 overflow-y-auto">
-              {availableSubcategories.map((sub) => {
-                const isSelected = subcategory.toLowerCase() === sub.toLowerCase();
-                return (
-                  <button
-                    key={sub}
-                    type="button"
-                    onClick={() => handleSubcategorySelect(sub)}
-                    className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all border cursor-pointer flex items-center gap-1 ${
-                      isSelected
-                        ? 'bg-red-600 text-white border-red-600 shadow-2xs'
-                        : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-red-400'
-                    }`}
-                  >
-                    <Tag className={`w-2.5 h-2.5 ${isSelected ? 'text-white' : 'text-red-500'}`} />
-                    <span>{sub}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
 
           {/* Inline Add New Subcategory input */}
           {showNewSubInput && (
