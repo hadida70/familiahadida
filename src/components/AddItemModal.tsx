@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Plus, Zap, UserCheck, Sparkles, Layers } from 'lucide-react';
 import { Member, GroceryItem, CustomList } from '../types';
@@ -31,12 +31,21 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
     members.length > 1 ? members[1].id : members[0]?.id || 'unassigned'
   );
   const [urgent, setUrgent] = useState(false);
+  const titleInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (activeListId) {
       setSelectedListId(activeListId);
     }
   }, [activeListId, isOpen]);
+
+  useEffect(() => {
+    if (isOpen) {
+      setTimeout(() => {
+        titleInputRef.current?.focus();
+      }, 50);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -65,6 +74,9 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
 
   const applySuggestion = (s: { name: string; emoji: string }) => {
     setTitle(s.name);
+    setTimeout(() => {
+      titleInputRef.current?.focus();
+    }, 10);
   };
 
   return (
@@ -150,11 +162,13 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
                 Nombre del producto o tarea *
               </label>
               <input
+                ref={titleInputRef}
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Ej. Leche descremada, Clavos 2 pulgadas, Aspirina..."
                 required
+                autoFocus
                 className="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-emerald-500 dark:focus:border-emerald-500 text-slate-900 dark:text-white font-medium text-base outline-none transition-colors"
               />
             </div>

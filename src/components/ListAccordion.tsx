@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Plus,
   Trash2,
@@ -52,6 +52,7 @@ export const ListAccordion: React.FC<ListAccordionProps> = ({
 }) => {
   const [quickInputs, setQuickInputs] = useState<Record<string, string>>({});
   const [listToDelete, setListToDelete] = useState<CustomList | null>(null);
+  const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const handleInputChange = (listId: string, value: string) => {
     setQuickInputs((prev) => ({ ...prev, [listId]: value }));
@@ -63,6 +64,9 @@ export const ListAccordion: React.FC<ListAccordionProps> = ({
     if (!text) return;
     onQuickAddItem(text, listId);
     setQuickInputs((prev) => ({ ...prev, [listId]: '' }));
+    setTimeout(() => {
+      inputRefs.current[listId]?.focus();
+    }, 10);
   };
 
   return (
@@ -189,6 +193,9 @@ export const ListAccordion: React.FC<ListAccordionProps> = ({
                       className="flex items-center gap-2 mb-3 mt-1"
                     >
                       <input
+                        ref={(el) => {
+                          inputRefs.current[list.id] = el;
+                        }}
                         type="text"
                         value={inputValue}
                         onChange={(e) => handleInputChange(list.id, e.target.value)}

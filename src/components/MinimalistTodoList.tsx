@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Square,
@@ -34,6 +34,7 @@ export const MinimalistTodoList: React.FC<MinimalistTodoListProps> = ({
   // Input state
   const [newText, setNewText] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   // Editing state
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -56,6 +57,9 @@ export const MinimalistTodoList: React.FC<MinimalistTodoListProps> = ({
     });
 
     setNewText('');
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 10);
   };
 
   // Handle Toggle Complete
@@ -92,6 +96,7 @@ export const MinimalistTodoList: React.FC<MinimalistTodoListProps> = ({
         className="bg-white dark:bg-slate-900 rounded-2xl p-2 sm:p-2.5 border border-slate-200/90 dark:border-slate-800 shadow-xs flex items-center gap-2"
       >
         <input
+          ref={inputRef}
           type="text"
           value={newText}
           onChange={(e) => setNewText(e.target.value)}
