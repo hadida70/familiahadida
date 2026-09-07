@@ -189,6 +189,26 @@ export function initDatabase() {
   if (userCount.count === 0) {
     seedOrMigrateFromLegacy();
   }
+
+  // Auto-migration: Ensure Cédula / DNI is migrated to Cédula in existing databases if present
+  try {
+    const identCat = db.prepare('SELECT * FROM data_categories WHERE id = ?').get('cat_identificacion') as any;
+    if (identCat && identCat.subcategories_json && identCat.subcategories_json.includes('Cédula / DNI')) {
+      const subs: string[] = JSON.parse(identCat.subcategories_json);
+      const newSubs = subs.map((s) => (s === 'Cédula / DNI' ? 'Cédula' : s));
+      db.prepare('UPDATE data_categories SET subcategories_json = ? WHERE id = ?').run(
+        JSON.stringify(newSubs),
+        'cat_identificacion'
+      );
+      db.prepare(`
+        UPDATE personal_records
+        SET subcategory = 'Cédula'
+        WHERE subcategory = 'Cédula / DNI'
+      `).run();
+    }
+  } catch (err) {
+    console.error('Migration check error:', err);
+  }
 }
 
 function hashPin(pin: string): string {
@@ -352,7 +372,7 @@ function seedOrMigrateFromLegacy() {
           icon: 'id-card',
           color: '#2563eb',
           description: 'Documentos oficiales de identidad, pasaportes y licencias',
-          subcategories: ['Cédula / DNI', 'Pasaporte', 'Partida de Nacimiento', 'Licencia de Conducir', 'Visas / Residencia / Teudat Zehut', 'Libreta Militar'],
+          subcategories: ['Cédula', 'Pasaporte', 'Partida de Nacimiento', 'Licencia de Conducir', 'Visas / Residencia / Teudat Zehut', 'Libreta Militar'],
           isDefault: true,
           createdAt: new Date().toISOString(),
         },
@@ -825,6 +845,108 @@ export function updateDataCategory(id: string, updates: Partial<DataCategory>) {
     subcategories: JSON.parse(subcategoriesJson),
     isDefault: Boolean(current.is_default),
     createdAt: current.created_at,
+  };
+}
+
+export function renameSubcategory(categoryId: string, oldSubName: string, newSubName: string, updateRecords: boolean = true) {
+  const cat = db.prepare('SELECT * FROM data_categories WHERE id = ?').get(categoryId) as any;
+  if (!cat) return null;
+
+  const oldTrimmed = oldSubName.trim();
+  const newTrimmed = newSubName.trim();
+  const currentSubs: string[] = cat.subcategories_json ? JSON.parse(cat.subcategories_json) : [];
+
+  let replaced = false;
+  const updatedSubs = currentSubs.map((s) => {
+    if (s.toLowerCase() === oldTrimmed.toLowerCase() || s.toLowerCase() === newTrimmed.toLowerCase()) {
+      replaced = true;
+      return newTrimmed;
+    }
+    return s;
+  });
+
+  if (!replaced) {
+    updatedSubs.push(newTrimmed);
+  }
+
+  // Remove duplicate subcategories
+  const uniqueSubs = Array.from(new Set(updatedSubs));
+
+  db.prepare('UPDATE data_categories SET subcategories_json = ? WHERE id = ?').run(
+    JSON.stringify(uniqueSubs),
+    categoryId
+  );
+
+  if (updateRecords) {
+    db.prepare(`
+      UPDATE personal_records
+      SET subcategory = ?
+      WHERE (LOWER(category) = LOWER(?) OR category = ?)
+        AND (LOWER(subcategory) = LOWER(?) OR subcategory = ?)
+    `).run(newTrimmed, cat.name, cat.name, oldTrimmed, oldTrimmed);
+  }
+
+  return {
+    id: categoryId,
+    name: cat.name,
+    icon: cat.icon,
+    color: cat.color,
+    description: cat.description,
+    subcategories: uniqueSubs,
+    isDefault: Boolean(cat.is_default),
+    createdAt: cat.created_at,
+  };
+}
+
+export function addSubcategoryToCategory(categoryId: string, subName: string) {
+  const cat = db.prepare('SELECT * FROM data_categories WHERE id = ?').get(categoryId) as any;
+  if (!cat) return null;
+
+  const trimmed = subName.trim();
+  const currentSubs: string[] = cat.subcategories_json ? JSON.parse(cat.subcategories_json) : [];
+
+  if (!currentSubs.some((s) => s.toLowerCase() === trimmed.toLowerCase())) {
+    currentSubs.push(trimmed);
+    db.prepare('UPDATE data_categories SET subcategories_json = ? WHERE id = ?').run(
+      JSON.stringify(currentSubs),
+      categoryId
+    );
+  }
+
+  return {
+    id: categoryId,
+    name: cat.name,
+    icon: cat.icon,
+    color: cat.color,
+    description: cat.description,
+    subcategories: currentSubs,
+    isDefault: Boolean(cat.is_default),
+    createdAt: cat.created_at,
+  };
+}
+
+export function deleteSubcategoryFromCategory(categoryId: string, subName: string) {
+  const cat = db.prepare('SELECT * FROM data_categories WHERE id = ?').get(categoryId) as any;
+  if (!cat) return null;
+
+  const trimmed = subName.trim().toLowerCase();
+  const currentSubs: string[] = cat.subcategories_json ? JSON.parse(cat.subcategories_json) : [];
+  const updatedSubs = currentSubs.filter((s) => s.toLowerCase() !== trimmed);
+
+  db.prepare('UPDATE data_categories SET subcategories_json = ? WHERE id = ?').run(
+    JSON.stringify(updatedSubs),
+    categoryId
+  );
+
+  return {
+    id: categoryId,
+    name: cat.name,
+    icon: cat.icon,
+    color: cat.color,
+    description: cat.description,
+    subcategories: updatedSubs,
+    isDefault: Boolean(cat.is_default),
+    createdAt: cat.created_at,
   };
 }
 

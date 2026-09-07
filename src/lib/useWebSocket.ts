@@ -328,6 +328,21 @@ export function useWebSocket(): UseWebSocketReturn {
               }));
               break;
 
+            case 'APP_DATA_SYNC':
+              if (msg.payload) {
+                setData((prev) => ({
+                  ...prev,
+                  ...msg.payload,
+                  dataCategories: msg.payload.dataCategories !== undefined ? msg.payload.dataCategories : prev.dataCategories,
+                  personalRecords: msg.payload.personalRecords !== undefined ? msg.payload.personalRecords : prev.personalRecords,
+                  items: msg.payload.items !== undefined ? msg.payload.items : prev.items,
+                  lists: msg.payload.lists !== undefined ? msg.payload.lists : prev.lists,
+                  todos: msg.payload.todos !== undefined ? msg.payload.todos : prev.todos,
+                  calendarTasks: msg.payload.calendarTasks !== undefined ? msg.payload.calendarTasks : prev.calendarTasks,
+                }));
+              }
+              break;
+
             case 'DATA_CATEGORY_ADDED':
               setData((prev) => ({
                 ...prev,
@@ -721,6 +736,10 @@ export function useWebSocket(): UseWebSocketReturn {
   };
 
   const deleteDataCategory = async (id: string) => {
+    setData((prev) => ({
+      ...prev,
+      dataCategories: (prev.dataCategories || []).filter((c) => c.id !== id),
+    }));
     try {
       await fetch(`/api/data-categories/${id}`, {
         method: 'DELETE',
@@ -732,12 +751,36 @@ export function useWebSocket(): UseWebSocketReturn {
   };
 
   const addSubcategory = async (categoryId: string, subcategoryName: string) => {
+    const trimmed = subcategoryName.trim();
+    if (!trimmed) return;
+
+    setData((prev) => ({
+      ...prev,
+      dataCategories: (prev.dataCategories || []).map((c) => {
+        if (c.id === categoryId) {
+          const subs = [...(c.subcategories || [])];
+          if (!subs.some((s) => s.toLowerCase() === trimmed.toLowerCase())) {
+            subs.push(trimmed);
+          }
+          return { ...c, subcategories: subs };
+        }
+        return c;
+      }),
+    }));
+
     try {
-      await fetch(`/api/data-categories/${categoryId}/subcategories`, {
+      const res = await fetch(`/api/data-categories/${categoryId}/subcategories`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ subcategoryName }),
+        body: JSON.stringify({ subcategoryName: trimmed }),
       });
+      if (res.ok) {
+        const cat = await res.json();
+        setData((prev) => ({
+          ...prev,
+          dataCategories: (prev.dataCategories || []).map((c) => (c.id === categoryId ? cat : c)),
+        }));
+      }
     } catch (err) {
       console.error('Error adding subcategory:', err);
     }
@@ -749,23 +792,88 @@ export function useWebSocket(): UseWebSocketReturn {
     newSubcategoryName: string,
     updateRecords: boolean = true
   ) => {
+    const oldTrimmed = oldSubcategoryName.trim();
+    const newTrimmed = newSubcategoryName.trim();
+    if (!newTrimmed) return;
+
+    // Immediate optimistic update
+    setData((prev) => ({
+      ...prev,
+      dataCategories: (prev.dataCategories || []).map((c) => {
+        if (c.id === categoryId) {
+          const subs = (c.subcategories || []).map((s) =>
+            s.toLowerCase() === oldTrimmed.toLowerCase() ? newTrimmed : s
+          );
+          if (!subs.some((s) => s.toLowerCase() === newTrimmed.toLowerCase())) {
+            subs.push(newTrimmed);
+          }
+          return { ...c, subcategories: Array.from(new Set(subs)) };
+        }
+        return c;
+      }),
+      personalRecords: updateRecords !== false
+        ? (prev.personalRecords || []).map((r) =>
+            r.subcategory?.toLowerCase() === oldTrimmed.toLowerCase()
+              ? { ...r, subcategory: newTrimmed }
+              : r
+          )
+        : prev.personalRecords,
+    }));
+
     try {
-      await fetch(`/api/data-categories/${categoryId}/subcategories/rename`, {
+      const res = await fetch(`/api/data-categories/${categoryId}/subcategories/rename`, {
         method: 'PUT',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ oldSubcategoryName, newSubcategoryName, updateRecords }),
+        body: JSON.stringify({ oldSubcategoryName: oldTrimmed, newSubcategoryName: newTrimmed, updateRecords }),
       });
+      if (res.ok) {
+        const resData = await res.json();
+        if (resData.data) {
+          setData((prev) => ({
+            ...prev,
+            ...resData.data,
+          }));
+        } else if (resData.category) {
+          setData((prev) => ({
+            ...prev,
+            dataCategories: (prev.dataCategories || []).map((c) =>
+              c.id === categoryId ? resData.category : c
+            ),
+          }));
+        }
+      }
     } catch (err) {
       console.error('Error renaming subcategory:', err);
     }
   };
 
   const deleteSubcategory = async (categoryId: string, subcategoryName: string) => {
+    const trimmed = subcategoryName.trim().toLowerCase();
+    setData((prev) => ({
+      ...prev,
+      dataCategories: (prev.dataCategories || []).map((c) => {
+        if (c.id === categoryId) {
+          return {
+            ...c,
+            subcategories: (c.subcategories || []).filter((s) => s.toLowerCase() !== trimmed),
+          };
+        }
+        return c;
+      }),
+    }));
+
     try {
-      await fetch(`/api/data-categories/${categoryId}/subcategories/${encodeURIComponent(subcategoryName)}`, {
+      const res = await fetch(`/api/data-categories/${categoryId}/subcategories/${encodeURIComponent(subcategoryName)}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
       });
+      if (res.ok) {
+        const cat = await res.json();
+        setData((prev) => ({
+          ...prev,
+          dataCategories: (prev.dataCategories || []).map((c) => (c.id === categoryId ? cat : c)),
+        }));
+      }
     } catch (err) {
       console.error('Error deleting subcategory:', err);
     }

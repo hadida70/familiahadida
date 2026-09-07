@@ -40,6 +40,9 @@ import {
   insertDataCategory,
   updateDataCategory,
   deleteDataCategory,
+  renameSubcategory,
+  addSubcategoryToCategory,
+  deleteSubcategoryFromCategory,
   insertCalendarTask,
   updateCalendarTask,
   deleteCalendarTask,
@@ -853,8 +856,8 @@ async function startServer() {
     res.json(data.dataCategories || []);
   });
 
-  // POST /api/data-categories - Add new category (Admin only)
-  app.post('/api/data-categories', requireAdmin, (req: AuthRequest, res) => {
+  // POST /api/data-categories - Add new category
+  app.post('/api/data-categories', requireAuth, (req: AuthRequest, res) => {
     const { name, icon, color, description, subcategories } = req.body;
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'El nombre de la categoría es obligatorio' });
@@ -875,47 +878,56 @@ async function startServer() {
 
     insertDataCategory(newCategory);
     broadcast('DATA_CATEGORY_ADDED', { category: newCategory });
+    const fullData = getAllAppData();
+    broadcast('APP_DATA_SYNC', fullData);
     res.status(201).json(newCategory);
   });
 
-  // PUT /api/data-categories/:id - Update category (Admin only)
-  app.put('/api/data-categories/:id', requireAdmin, (req: AuthRequest, res) => {
+  // PUT /api/data-categories/:id - Update category
+  app.put('/api/data-categories/:id', requireAuth, (req: AuthRequest, res) => {
     const { id } = req.params;
+    const oldCat = getAllAppData().dataCategories?.find((c) => c.id === id);
     const updated = updateDataCategory(id, req.body);
     if (!updated) {
       return res.status(404).json({ error: 'Categoría no encontrada' });
     }
 
+    if (oldCat && req.body.name && oldCat.name !== req.body.name) {
+      db.prepare(`
+        UPDATE personal_records
+        SET category = ?
+        WHERE LOWER(category) = LOWER(?) OR category = ?
+      `).run(req.body.name, oldCat.name, oldCat.name);
+    }
+
     broadcast('DATA_CATEGORY_UPDATED', { category: updated });
+    const fullData = getAllAppData();
+    broadcast('APP_DATA_SYNC', fullData);
     res.json(updated);
   });
 
-  // PUT /api/data-categories/:id/subcategories/rename - Rename a subcategory (Admin only)
-  app.put('/api/data-categories/:id/subcategories/rename', requireAdmin, (req: AuthRequest, res) => {
+  // PUT /api/data-categories/:id/subcategories/rename - Rename a subcategory
+  app.put('/api/data-categories/:id/subcategories/rename', requireAuth, (req: AuthRequest, res) => {
     const { id } = req.params;
-    const { oldSubcategoryName, newSubcategoryName } = req.body;
+    const { oldSubcategoryName, newSubcategoryName, updateRecords } = req.body;
 
     if (!oldSubcategoryName || !newSubcategoryName || !newSubcategoryName.trim()) {
       return res.status(400).json({ error: 'Nombres de subcategoría anterior y nuevo requeridos' });
     }
 
-    const allData = getAllAppData();
-    const cat = allData.dataCategories?.find((c) => c.id === id);
-    if (!cat) {
+    const updated = renameSubcategory(id, oldSubcategoryName, newSubcategoryName, updateRecords !== false);
+    if (!updated) {
       return res.status(404).json({ error: 'Categoría no encontrada' });
     }
 
-    const oldTrimmed = oldSubcategoryName.trim();
-    const newTrimmed = newSubcategoryName.trim();
-    const updatedSubs = (cat.subcategories || []).map((s) => (s.toLowerCase() === oldTrimmed.toLowerCase() ? newTrimmed : s));
-
-    const updated = updateDataCategory(id, { subcategories: updatedSubs });
     broadcast('DATA_CATEGORY_UPDATED', { category: updated });
-    res.json(updated);
+    const fullData = getAllAppData();
+    broadcast('APP_DATA_SYNC', fullData);
+    res.json({ category: updated, data: fullData });
   });
 
-  // POST /api/data-categories/:id/subcategories - Add subcategory (Admin only)
-  app.post('/api/data-categories/:id/subcategories', requireAdmin, (req: AuthRequest, res) => {
+  // POST /api/data-categories/:id/subcategories - Add subcategory
+  app.post('/api/data-categories/:id/subcategories', requireAuth, (req: AuthRequest, res) => {
     const { id } = req.params;
     const { subcategoryName } = req.body;
 
@@ -923,46 +935,40 @@ async function startServer() {
       return res.status(400).json({ error: 'El nombre de la subcategoría es obligatorio' });
     }
 
-    const allData = getAllAppData();
-    const cat = allData.dataCategories?.find((c) => c.id === id);
-    if (!cat) {
+    const updated = addSubcategoryToCategory(id, subcategoryName);
+    if (!updated) {
       return res.status(404).json({ error: 'Categoría no encontrada' });
     }
 
-    const trimmed = subcategoryName.trim();
-    const currentSubs = cat.subcategories || [];
-    if (!currentSubs.some((s) => s.toLowerCase() === trimmed.toLowerCase())) {
-      currentSubs.push(trimmed);
-      const updated = updateDataCategory(id, { subcategories: currentSubs });
-      broadcast('DATA_CATEGORY_UPDATED', { category: updated });
-      return res.json(updated);
-    }
-
-    res.json(cat);
-  });
-
-  // DELETE /api/data-categories/:id/subcategories/:subName - Remove subcategory (Admin only)
-  app.delete('/api/data-categories/:id/subcategories/:subName', requireAdmin, (req: AuthRequest, res) => {
-    const { id, subName } = req.params;
-    const decodedSubName = decodeURIComponent(subName);
-
-    const allData = getAllAppData();
-    const cat = allData.dataCategories?.find((c) => c.id === id);
-    if (!cat) {
-      return res.status(404).json({ error: 'Categoría no encontrada' });
-    }
-
-    const updatedSubs = (cat.subcategories || []).filter((s) => s.toLowerCase() !== decodedSubName.toLowerCase());
-    const updated = updateDataCategory(id, { subcategories: updatedSubs });
     broadcast('DATA_CATEGORY_UPDATED', { category: updated });
+    const fullData = getAllAppData();
+    broadcast('APP_DATA_SYNC', fullData);
     res.json(updated);
   });
 
-  // DELETE /api/data-categories/:id - Delete category (Admin only)
-  app.delete('/api/data-categories/:id', requireAdmin, (req: AuthRequest, res) => {
+  // DELETE /api/data-categories/:id/subcategories/:subName - Remove subcategory
+  app.delete('/api/data-categories/:id/subcategories/:subName', requireAuth, (req: AuthRequest, res) => {
+    const { id, subName } = req.params;
+    const decodedSubName = decodeURIComponent(subName);
+
+    const updated = deleteSubcategoryFromCategory(id, decodedSubName);
+    if (!updated) {
+      return res.status(404).json({ error: 'Categoría no encontrada' });
+    }
+
+    broadcast('DATA_CATEGORY_UPDATED', { category: updated });
+    const fullData = getAllAppData();
+    broadcast('APP_DATA_SYNC', fullData);
+    res.json(updated);
+  });
+
+  // DELETE /api/data-categories/:id - Delete category
+  app.delete('/api/data-categories/:id', requireAuth, (req: AuthRequest, res) => {
     const { id } = req.params;
     deleteDataCategory(id);
     broadcast('DATA_CATEGORY_DELETED', { categoryId: id });
+    const fullData = getAllAppData();
+    broadcast('APP_DATA_SYNC', fullData);
     res.json({ success: true, categoryId: id });
   });
 
