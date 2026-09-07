@@ -1,6 +1,7 @@
 import React from 'react';
 import { LogOut, Crown, User, ShieldAlert, Lock } from 'lucide-react';
 import { FamiliaHadidaLogo } from './FamiliaHadidaLogo';
+import { InstallPwaButton } from './InstallPwaButton';
 import { Member } from '../types';
 
 interface HeaderProps {
@@ -82,6 +83,9 @@ export const Header: React.FC<HeaderProps> = ({
             />
             <span className="hidden lg:inline">{connected ? 'En vivo' : 'Sync'}</span>
           </div>
+
+          {/* PWA Install Button */}
+          <InstallPwaButton />
 
           {/* Lock / Switch Profile button */}
           {onLock && (
