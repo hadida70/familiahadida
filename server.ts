@@ -19,6 +19,7 @@ import {
   TodoItem,
 } from './src/types.ts';
 import {
+  db,
   initDatabase,
   getAllAppData,
   getUserById,
@@ -378,19 +379,67 @@ async function startServer() {
 
   // ================= FILE UPLOAD ROUTE (ADMIN ONLY) =================
 
-  // POST /api/upload - Upload file to disk storage (Admin only)
-  app.post('/api/upload', requireAdmin, upload.single('file'), (req: AuthRequest, res) => {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No se subió ningún archivo.' });
+  // POST /api/upload - Upload single or multiple files to disk storage (Admin only)
+  app.post('/api/upload', requireAdmin, (req: AuthRequest, res, next) => {
+    upload.fields([{ name: 'files', maxCount: 20 }, { name: 'file', maxCount: 1 }])(req, res, (err) => {
+      if (err) {
+        return res.status(400).json({ error: err.message || 'Error al procesar archivos adjuntos' });
+      }
+
+      const filesList: Express.Multer.File[] = [];
+      const reqFiles = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
+
+      if (reqFiles) {
+        if (reqFiles['files']) filesList.push(...reqFiles['files']);
+        if (reqFiles['file']) filesList.push(...reqFiles['file']);
+      }
+
+      if (filesList.length === 0) {
+        return res.status(400).json({ error: 'No se subió ningún archivo.' });
+      }
+
+      const uploadedFiles = filesList.map((f) => ({
+        id: 'att_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+        fileName: f.originalname,
+        fileUrl: `/uploads/${f.filename}`,
+        fileType: f.mimetype,
+        fileSize: f.size,
+        createdAt: new Date().toISOString(),
+      }));
+
+      const primary = uploadedFiles[0];
+
+      res.json({
+        success: true,
+        files: uploadedFiles,
+        // Single file compatibility properties
+        fileName: primary.fileName,
+        fileUrl: primary.fileUrl,
+        fileType: primary.fileType,
+        fileSize: primary.fileSize,
+      });
+    });
+  });
+
+  // POST /api/upload-multiple - Explicit multiple files upload route
+  app.post('/api/upload-multiple', requireAdmin, upload.array('files', 20), (req: AuthRequest, res) => {
+    const files = (req.files as Express.Multer.File[]) || [];
+    if (files.length === 0) {
+      return res.status(400).json({ error: 'No se enviaron archivos para subir.' });
     }
 
-    const fileUrl = `/uploads/${req.file.filename}`;
+    const uploadedFiles = files.map((f) => ({
+      id: 'att_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+      fileName: f.originalname,
+      fileUrl: `/uploads/${f.filename}`,
+      fileType: f.mimetype,
+      fileSize: f.size,
+      createdAt: new Date().toISOString(),
+    }));
+
     res.json({
       success: true,
-      fileName: req.file.originalname,
-      fileUrl,
-      fileType: req.file.mimetype,
-      fileSize: req.file.size,
+      files: uploadedFiles,
     });
   });
 
@@ -744,11 +793,13 @@ async function startServer() {
       subcategory,
       title,
       notes,
+      attachments,
       fileName,
       fileType,
       fileSize,
       fileUrl,
       fileDataUrl,
+      todos,
       cardNumber,
       cardHolder,
       cardExp,
@@ -770,11 +821,13 @@ async function startServer() {
       subcategory: subcategory.trim(),
       title: title ? title.trim() : subcategory.trim(),
       notes: notes || '',
+      attachments: Array.isArray(attachments) ? attachments : [],
       fileName: fileName || '',
       fileType: fileType || '',
       fileSize: fileSize || 0,
       fileUrl: fileUrl || '',
       fileDataUrl: fileDataUrl || '',
+      todos: Array.isArray(todos) ? todos : [],
       cardNumber: cardNumber || '',
       cardHolder: cardHolder || '',
       cardExp: cardExp || '',
@@ -825,21 +878,25 @@ async function startServer() {
   // DELETE /api/personal-records/:id - Delete personal record (ADMIN ONLY: Jaime)
   app.delete('/api/personal-records/:id', requireAdmin, (req: AuthRequest, res) => {
     const { id } = req.params;
-    const { success, fileUrl } = deletePersonalRecord(id);
+    const { success, fileUrls } = deletePersonalRecord(id);
 
     if (!success) {
       return res.status(404).json({ error: 'Registro no encontrado' });
     }
 
-    // Clean up disk file if present
-    if (fileUrl && fileUrl.startsWith('/uploads/')) {
-      const fileName = path.basename(fileUrl);
-      const filePath = path.join(UPLOADS_DIR, fileName);
-      if (fs.existsSync(filePath)) {
-        try {
-          fs.unlinkSync(filePath);
-        } catch (e) {
-          console.error('Error deleting file from disk:', e);
+    // Clean up disk files if present
+    if (Array.isArray(fileUrls)) {
+      for (const fileUrl of fileUrls) {
+        if (fileUrl && fileUrl.startsWith('/uploads/')) {
+          const fileName = path.basename(fileUrl);
+          const filePath = path.join(UPLOADS_DIR, fileName);
+          if (fs.existsSync(filePath)) {
+            try {
+              fs.unlinkSync(filePath);
+            } catch (e) {
+              console.error('Error deleting file from disk:', e);
+            }
+          }
         }
       }
     }

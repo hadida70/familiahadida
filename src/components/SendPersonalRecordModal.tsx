@@ -13,8 +13,13 @@ import {
   Eye,
   MessageCircle,
   BellRing,
+  Paperclip,
+  ListTodo,
+  CheckCircle2,
+  Square,
+  Image as ImageIcon,
 } from 'lucide-react';
-import { Member, PersonalRecord } from '../types';
+import { Member, PersonalRecord, RecordAttachment, RecordTodo } from '../types';
 
 interface SendPersonalRecordModalProps {
   isOpen: boolean;
@@ -23,7 +28,7 @@ interface SendPersonalRecordModalProps {
   records: PersonalRecord[];
   members: Member[];
   onSendAlert: (recipientId: string, title: string, message: string) => void;
-  onViewPhoto?: (record: PersonalRecord) => void;
+  onViewPhoto?: (record: PersonalRecord, attachmentIndex?: number) => void;
 }
 
 export const SendPersonalRecordModal: React.FC<SendPersonalRecordModalProps> = ({
@@ -54,6 +59,25 @@ export const SendPersonalRecordModal: React.FC<SendPersonalRecordModalProps> = (
   const activeRecord = records.find((r) => r.id === selectedRecordId) || initialRecord || records[0];
   const recordOwner = members.find((m) => m.id === activeRecord?.memberId);
 
+  // Normalize attachments & todos
+  const attachments: RecordAttachment[] =
+    activeRecord?.attachments && activeRecord.attachments.length > 0
+      ? activeRecord.attachments
+      : activeRecord?.fileDataUrl || activeRecord?.fileUrl
+      ? [
+          {
+            id: 'att_' + activeRecord.id,
+            fileName: activeRecord.fileName || 'Documento adjunto',
+            fileType: activeRecord.fileType || '',
+            fileSize: activeRecord.fileSize || 0,
+            fileUrl: activeRecord.fileUrl || '',
+            fileDataUrl: activeRecord.fileDataUrl || '',
+          },
+        ]
+      : [];
+
+  const todos: RecordTodo[] = activeRecord?.todos || [];
+
   useEffect(() => {
     if (activeRecord) {
       const ownerName = recordOwner?.name || 'Integrante';
@@ -65,22 +89,18 @@ export const SendPersonalRecordModal: React.FC<SendPersonalRecordModalProps> = (
           `💳 Tarjeta: ${activeRecord.cardBank || subcat} (${activeRecord.cardNumber}) | Vence: ${activeRecord.cardExp || 'N/D'} | CVC: ${activeRecord.cardCvc || '•••'} | Titular: ${activeRecord.cardHolder || ownerName}`
         );
       } else {
+        const attCountStr = attachments.length > 0 ? ` (${attachments.length} archivo${attachments.length > 1 ? 's' : ''} adjunto${attachments.length > 1 ? 's' : ''})` : '';
+        const todoCountStr = todos.length > 0 ? ` [${todos.filter(t => !t.completed).length} tareas pendientes]` : '';
         setCustomMessage(
-          `📁 Dato Personal compartido: ${cat} - ${subcat} de ${ownerName}.${
-            activeRecord.fileName ? ` (Archivo adjunto: ${activeRecord.fileName})` : ''
-          }`
+          `📁 Dato Personal compartido: ${cat} - ${subcat} de ${ownerName}.${attCountStr}${todoCountStr}`
         );
       }
     }
     setSentSuccess(false);
     setCopied(false);
-  }, [selectedRecordId, activeRecord, recordOwner]);
+  }, [selectedRecordId, activeRecord, recordOwner, attachments.length, todos.length]);
 
   if (!isOpen || !activeRecord) return null;
-
-  const isImage =
-    activeRecord.fileType?.startsWith('image/') ||
-    (activeRecord.fileDataUrl && activeRecord.fileDataUrl.startsWith('data:image/'));
 
   const handleSendNotification = (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,8 +129,19 @@ export const SendPersonalRecordModal: React.FC<SendPersonalRecordModalProps> = (
         `👤 *Titular:* ${activeRecord.cardHolder || ownerName}\n`;
     }
 
-    if (activeRecord.fileName) {
-      text += `📎 *Adjunto:* ${activeRecord.fileName}\n`;
+    if (attachments.length > 0) {
+      text += `\n📎 *Documentos Adjuntos (${attachments.length}):*\n`;
+      attachments.forEach((a, i) => {
+        const labelStr = a.label ? ` [${a.label}]` : '';
+        text += `  ${i + 1}. ${a.fileName}${labelStr}\n`;
+      });
+    }
+
+    if (todos.length > 0) {
+      text += `\n📋 *Lista To-Do / Checklist:*\n`;
+      todos.forEach((t) => {
+        text += `  ${t.completed ? '✅' : '⬜'} ${t.text}\n`;
+      });
     }
 
     text += `\n💬 ${customMessage}`;
@@ -133,24 +164,36 @@ export const SendPersonalRecordModal: React.FC<SendPersonalRecordModalProps> = (
         `Banco: ${activeRecord.cardBank || ''}\n`;
     }
 
-    if (activeRecord.fileName) {
-      text += `Archivo: ${activeRecord.fileName}\n`;
+    if (attachments.length > 0) {
+      text += `\nDocumentos Adjuntos (${attachments.length}):\n`;
+      attachments.forEach((a, i) => {
+        const labelStr = a.label ? ` [${a.label}]` : '';
+        text += `- ${a.fileName}${labelStr}\n`;
+      });
     }
 
-    text += `Mensaje: ${customMessage}`;
+    if (todos.length > 0) {
+      text += `\nLista To-Do:\n`;
+      todos.forEach((t) => {
+        text += `[${t.completed ? 'X' : ' '}] ${t.text}\n`;
+      });
+    }
+
+    text += `\nMensaje: ${customMessage}`;
 
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleDownload = () => {
-    if (activeRecord.fileDataUrl) {
+  const handleDownloadAttachment = (att: RecordAttachment) => {
+    const targetUrl = att.fileUrl || att.fileDataUrl;
+    if (targetUrl) {
       const link = document.createElement('a');
-      link.href = activeRecord.fileDataUrl;
+      link.href = targetUrl;
       link.download =
-        activeRecord.fileName ||
-        `${(activeRecord.subcategory || activeRecord.category || 'dato_personal')
+        att.fileName ||
+        `${(activeRecord.subcategory || activeRecord.category || 'documento')
           .toLowerCase()
           .replace(/\s+/g, '_')}`;
       document.body.appendChild(link);
@@ -167,13 +210,13 @@ export const SendPersonalRecordModal: React.FC<SendPersonalRecordModalProps> = (
     >
       <div
         id="modal-send-personal-record-content"
-        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden my-6 transition-all"
+        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden my-6 transition-all max-h-[92vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+        <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-red-50 dark:bg-red-950/40 text-red-600 flex items-center justify-center border border-red-200/50">
+            <div className="w-9 h-9 rounded-2xl bg-red-50 dark:bg-red-950/40 text-red-600 flex items-center justify-center border border-red-200/50">
               <Send className="w-5 h-5" />
             </div>
             <div>
@@ -181,21 +224,21 @@ export const SendPersonalRecordModal: React.FC<SendPersonalRecordModalProps> = (
                 Enviar o Compartir Datos Personales
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Envía alertas a los integrantes de la familia o comparte por WhatsApp
+                Envía alertas con adjuntos y listas To-Do a la familia o comparte por WhatsApp
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSendNotification} className="p-5 space-y-4">
+        <form onSubmit={handleSendNotification} className="p-5 space-y-4 overflow-y-auto flex-1">
           {sentSuccess && (
-            <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-700 dark:text-emerald-300 font-bold flex items-center gap-2">
+            <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-700 dark:text-emerald-300 font-bold flex items-center gap-2">
               <Check className="w-4 h-4 text-emerald-600" />
               <span>¡Notificación enviada exitosamente a la familia!</span>
             </div>
@@ -211,14 +254,16 @@ export const SendPersonalRecordModal: React.FC<SendPersonalRecordModalProps> = (
               <select
                 value={selectedRecordId}
                 onChange={(e) => setSelectedRecordId(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm text-slate-900 dark:text-white font-medium outline-none focus:ring-2 focus:ring-red-500/30"
+                className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm text-slate-900 dark:text-white font-medium outline-none focus:ring-2 focus:ring-red-500/30"
               >
                 {records.map((r) => {
                   const owner = members.find((m) => m.id === r.memberId);
+                  const attCount = r.attachments?.length || (r.fileDataUrl || r.fileUrl ? 1 : 0);
+                  const todoCount = r.todos?.length || 0;
                   return (
                     <option key={r.id} value={r.id}>
                       {owner ? `${owner.name}: ` : ''}
-                      {r.category} → {r.subcategory} {r.fileName ? `📎 (${r.fileName})` : ''}
+                      {r.category} → {r.subcategory} {attCount > 0 ? `📎 (${attCount})` : ''} {todoCount > 0 ? `📋 (${todoCount})` : ''}
                     </option>
                   );
                 })}
@@ -227,14 +272,14 @@ export const SendPersonalRecordModal: React.FC<SendPersonalRecordModalProps> = (
           )}
 
           {/* Selected Record Summary Card */}
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
-            <div className="flex items-start justify-between gap-2 mb-2">
+          <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2.5">
+            <div className="flex items-start justify-between gap-2">
               <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-bold bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300">
                   <Folder className="w-3 h-3" />
                   {activeRecord.category}
                 </span>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-bold bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700">
                   <Tag className="w-3 h-3 text-red-500" />
                   {activeRecord.subcategory}
                 </span>
@@ -246,50 +291,97 @@ export const SendPersonalRecordModal: React.FC<SendPersonalRecordModalProps> = (
               )}
             </div>
 
-            {/* Attached Photo / Document preview if present */}
-            {activeRecord.fileDataUrl && (
-              <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 mt-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  {isImage ? (
-                    <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 border border-slate-200">
-                      <img
-                        src={activeRecord.fileDataUrl}
-                        alt="Adjunto"
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  ) : (
-                    <div className="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center shrink-0">
-                      <FileText className="w-4 h-4" />
-                    </div>
-                  )}
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
-                      {activeRecord.fileName || 'Archivo adjunto'}
-                    </p>
-                    <p className="text-[10px] text-slate-400">Listo para enviar</p>
-                  </div>
+            {/* Attached Photos & Documents list */}
+            {attachments.length > 0 && (
+              <div className="space-y-1.5 pt-1">
+                <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                  <Paperclip className="w-3 h-3 text-red-500" />
+                  <span>Documentos Adjuntos ({attachments.length}):</span>
                 </div>
+                {attachments.map((att, idx) => {
+                  const isImg =
+                    att.fileType?.startsWith('image/') ||
+                    (att.fileDataUrl && att.fileDataUrl.startsWith('data:image/'));
 
-                <div className="flex items-center gap-1 shrink-0">
-                  {isImage && onViewPhoto && (
-                    <button
-                      type="button"
-                      onClick={() => onViewPhoto(activeRecord)}
-                      className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 hover:text-red-600 cursor-pointer"
-                      title="Ver foto"
+                  return (
+                    <div
+                      key={att.id || idx}
+                      className="flex items-center justify-between gap-2 p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
                     >
-                      <Eye className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={handleDownload}
-                    className="p-1.5 rounded-lg bg-white dark:bg-slate-900 text-red-600 border border-red-500 hover:bg-red-50 cursor-pointer shadow-2xs"
-                    title="Descargar"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                  </button>
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        {isImg && att.fileDataUrl ? (
+                          <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 border border-slate-200">
+                            <img
+                              src={att.fileDataUrl}
+                              alt="Adjunto"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <div className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-950/40 text-red-600 flex items-center justify-center shrink-0">
+                            <FileText className="w-4 h-4" />
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {att.label && (
+                              <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded-md bg-red-600 text-white shrink-0">
+                                {att.label}
+                              </span>
+                            )}
+                            <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
+                              {att.fileName || `Documento ${idx + 1}`}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        {isImg && onViewPhoto && (
+                          <button
+                            type="button"
+                            onClick={() => onViewPhoto(activeRecord, idx)}
+                            className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 hover:text-red-600 cursor-pointer"
+                            title="Ver foto"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadAttachment(att)}
+                          className="p-1.5 rounded-lg bg-white dark:bg-slate-900 text-red-600 border border-red-500 hover:bg-red-50 cursor-pointer shadow-2xs"
+                          title="Descargar"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* To-Do Checklist summary preview */}
+            {todos.length > 0 && (
+              <div className="space-y-1 pt-1">
+                <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                  <ListTodo className="w-3 h-3 text-red-500" />
+                  <span>Tareas To-Do ({todos.length}):</span>
+                </div>
+                <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 space-y-1">
+                  {todos.map((t) => (
+                    <div key={t.id} className="flex items-center gap-1.5 text-xs">
+                      {t.completed ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      ) : (
+                        <Square className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      )}
+                      <span className={`truncate font-medium ${t.completed ? 'line-through text-slate-400' : 'text-slate-800 dark:text-slate-200'}`}>
+                        {t.text}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -304,7 +396,7 @@ export const SendPersonalRecordModal: React.FC<SendPersonalRecordModalProps> = (
             <select
               value={recipientId}
               onChange={(e) => setRecipientId(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 font-bold text-xs sm:text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-red-500/30"
+              className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 font-bold text-xs sm:text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-red-500/30"
             >
               <option value="all">📢 Todos los Integrantes de la Familia</option>
               {members.map((m) => (
@@ -326,7 +418,7 @@ export const SendPersonalRecordModal: React.FC<SendPersonalRecordModalProps> = (
               required
               value={customMessage}
               onChange={(e) => setCustomMessage(e.target.value)}
-              className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500/30 resize-none"
+              className="w-full px-3.5 py-2 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500/30 resize-none"
             />
           </div>
 
@@ -335,7 +427,7 @@ export const SendPersonalRecordModal: React.FC<SendPersonalRecordModalProps> = (
             <button
               type="button"
               onClick={handleWhatsAppShare}
-              className="flex-1 py-2 px-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 hover:bg-emerald-100 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+              className="flex-1 py-2.5 px-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 hover:bg-emerald-100 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
             >
               <MessageCircle className="w-4 h-4 text-emerald-600" />
               <span>Enviar por WhatsApp</span>
@@ -344,7 +436,7 @@ export const SendPersonalRecordModal: React.FC<SendPersonalRecordModalProps> = (
             <button
               type="button"
               onClick={handleCopySummary}
-              className="py-2 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
+              className="py-2.5 px-3.5 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
               title="Copiar datos al portapapeles"
             >
               {copied ? (
@@ -361,18 +453,18 @@ export const SendPersonalRecordModal: React.FC<SendPersonalRecordModalProps> = (
             </button>
           </div>
 
-          {/* Modal Action Buttons: White background with red border */}
-          <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
+          {/* Modal Action Buttons */}
+          <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100 dark:border-slate-800 shrink-0">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              className="px-4 py-2.5 rounded-2xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="px-5 py-2 rounded-xl text-xs font-bold bg-white dark:bg-slate-900 text-red-600 border border-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+              className="px-5 py-2.5 rounded-2xl text-xs font-bold bg-white dark:bg-slate-900 text-red-600 border border-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
             >
               <Send className="w-4 h-4" />
               <span>Enviar Notificación a Integrante</span>

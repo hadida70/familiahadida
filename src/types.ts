@@ -41,6 +41,26 @@ export interface GroceryItem {
   urgent?: boolean;
 }
 
+export interface RecordAttachment {
+  id: string;
+  fileName: string;
+  fileType?: string;
+  fileSize?: number;
+  fileUrl?: string; // Path or URL to download/view the uploaded file
+  fileDataUrl?: string; // base64 / data URL for preview fallback
+  label?: string; // Optional label e.g. "Frente", "Dorso", "Anexo", "Página 1", "Comprobante"
+  notes?: string;
+  createdAt?: string;
+}
+
+export interface RecordTodo {
+  id: string;
+  text: string;
+  completed: boolean;
+  createdAt?: string;
+  completedAt?: string;
+}
+
 export interface PersonalRecord {
   id: string;
   memberId: string; // ID of the member this personal data belongs to
@@ -48,11 +68,19 @@ export interface PersonalRecord {
   subcategory: string;
   title?: string;
   notes?: string;
+
+  // Multiple attachments support
+  attachments?: RecordAttachment[];
+
+  // Legacy single file fields for backward compatibility
   fileName?: string;
   fileType?: string;
   fileSize?: number;
   fileUrl?: string; // Path or URL to download/view the uploaded file
   fileDataUrl?: string; // base64 / data URL for preview fallback
+
+  // Embedded Checklist / To-Do items for this subcategory
+  todos?: RecordTodo[];
 
   // Credit / Debit Card specific fields
   cardNumber?: string;       // e.g. "4580 9811 3659 9900"

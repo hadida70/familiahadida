@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Trash2,
   Edit2,
@@ -11,9 +11,14 @@ import {
   Paperclip,
   CreditCard as CreditCardIcon,
   Image as ImageIcon,
+  CheckCircle2,
+  Square,
+  ListTodo,
+  Plus,
 } from 'lucide-react';
-import { Member, PersonalRecord } from '../types';
+import { Member, PersonalRecord, RecordAttachment, RecordTodo } from '../types';
 import { CreditCardVisualizer } from './CreditCardVisualizer';
+import { sounds } from '../lib/sound';
 
 interface PersonalRecordCardProps {
   record: PersonalRecord;
@@ -21,8 +26,9 @@ interface PersonalRecordCardProps {
   isAdmin?: boolean;
   onEdit: (record: PersonalRecord) => void;
   onDelete: (id: string) => void;
-  onViewPhoto: (record: PersonalRecord) => void;
+  onViewPhoto: (record: PersonalRecord, attachmentIndex?: number) => void;
   onSendRecord?: (record: PersonalRecord) => void;
+  onUpdateRecordTodos?: (recordId: string, todos: RecordTodo[]) => void;
 }
 
 export const isCreditCardRecord = (record: PersonalRecord) => {
@@ -49,28 +55,81 @@ export const PersonalRecordCard: React.FC<PersonalRecordCardProps> = ({
   onDelete,
   onViewPhoto,
   onSendRecord,
+  onUpdateRecordTodos,
 }) => {
-  const isImage =
-    record.fileType?.startsWith('image/') ||
-    (record.fileDataUrl && record.fileDataUrl.startsWith('data:image/'));
+  const [newQuickTodoText, setNewQuickTodoText] = useState('');
+  const [showAddTodoInput, setShowAddTodoInput] = useState(false);
+
+  // Normalize attachments array
+  const attachments: RecordAttachment[] =
+    record.attachments && record.attachments.length > 0
+      ? record.attachments
+      : record.fileDataUrl || record.fileUrl
+      ? [
+          {
+            id: 'att_' + record.id,
+            fileName: record.fileName || 'Documento adjunto',
+            fileType: record.fileType || '',
+            fileSize: record.fileSize || 0,
+            fileUrl: record.fileUrl || '',
+            fileDataUrl: record.fileDataUrl || '',
+            label: 'Principal',
+          },
+        ]
+      : [];
+
+  const imageAttachments = attachments.filter(
+    (a) => a.fileType?.startsWith('image/') || (a.fileDataUrl && a.fileDataUrl.startsWith('data:image/'))
+  );
 
   const isCard = isCreditCardRecord(record);
+  const todos: RecordTodo[] = record.todos || [];
+  const completedTodosCount = todos.filter((t) => t.completed).length;
 
-  const handleDownload = () => {
-    const targetUrl = record.fileUrl || record.fileDataUrl;
+  const handleDownloadAttachment = (att: RecordAttachment) => {
+    const targetUrl = att.fileUrl || att.fileDataUrl;
     if (targetUrl) {
       const link = document.createElement('a');
       link.href = targetUrl;
-      const downloadName =
-        record.fileName ||
-        `${(record.subcategory || record.category || 'documento')
-          .toLowerCase()
-          .replace(/\s+/g, '_')}`;
-      link.download = downloadName;
+      link.download = att.fileName || `${(record.subcategory || 'documento').toLowerCase().replace(/\s+/g, '_')}`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
     }
+  };
+
+  const handleToggleTodo = (todoId: string) => {
+    if (!onUpdateRecordTodos) return;
+    const nextTodos = todos.map((t) => {
+      if (t.id === todoId) {
+        const nextCompleted = !t.completed;
+        if (nextCompleted) sounds.playCheckSound();
+        return {
+          ...t,
+          completed: nextCompleted,
+          completedAt: nextCompleted ? new Date().toISOString() : undefined,
+        };
+      }
+      return t;
+    });
+    onUpdateRecordTodos(record.id, nextTodos);
+  };
+
+  const handleAddQuickTodo = (e: React.FormEvent) => {
+    e.preventDefault();
+    const text = newQuickTodoText.trim();
+    if (!text || !onUpdateRecordTodos) return;
+
+    const newTodo: RecordTodo = {
+      id: 'rtodo_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+      text,
+      completed: false,
+      createdAt: new Date().toISOString(),
+    };
+
+    onUpdateRecordTodos(record.id, [...todos, newTodo]);
+    setNewQuickTodoText('');
+    setShowAddTodoInput(false);
   };
 
   const formatFileSize = (bytes?: number) => {
@@ -122,7 +181,7 @@ export const PersonalRecordCard: React.FC<PersonalRecordCardProps> = ({
                 <button
                   onClick={() => onEdit(record)}
                   className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                  title="Editar"
+                  title="Editar o adjuntar más archivos"
                 >
                   <Edit2 className="w-3.5 h-3.5" />
                 </button>
@@ -140,9 +199,16 @@ export const PersonalRecordCard: React.FC<PersonalRecordCardProps> = ({
 
         {/* Subcategoría as Main Title */}
         <div className="mb-3">
-          <div className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500 mb-0.5">
-            <Tag className="w-3 h-3 text-red-500" />
-            <span>Subcategoría:</span>
+          <div className="flex items-center justify-between gap-1 text-xs text-slate-400 dark:text-slate-500 mb-0.5">
+            <div className="flex items-center gap-1.5">
+              <Tag className="w-3 h-3 text-red-500" />
+              <span>Subcategoría:</span>
+            </div>
+            {attachments.length > 0 && (
+              <span className="text-[10px] font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/50 px-2 py-0.5 rounded-md border border-red-200 dark:border-red-900/60">
+                📎 {attachments.length} {attachments.length === 1 ? 'archivo' : 'archivos'}
+              </span>
+            )}
           </div>
           <h4 className="text-base font-black text-slate-900 dark:text-white leading-tight">
             {record.subcategory || record.title || 'Dato Personal'}
@@ -167,62 +233,285 @@ export const PersonalRecordCard: React.FC<PersonalRecordCardProps> = ({
           </div>
         )}
 
-        {/* File & Photo Attachment Area */}
-        {record.fileDataUrl ? (
-          <div className="mb-3">
-            {isImage ? (
+        {/* ================= MULTI-DOCUMENT & PHOTO ATTACHMENTS AREA ================= */}
+        {attachments.length > 0 && (
+          <div className="mb-3.5 space-y-2">
+            {/* Multi-Photo Gallery Preview for 1, 2, or 3+ images */}
+            {imageAttachments.length === 1 && (
               <div
-                onClick={() => onViewPhoto(record)}
+                onClick={() => onViewPhoto(record, attachments.indexOf(imageAttachments[0]))}
                 className="relative rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 cursor-pointer group/img aspect-video sm:aspect-4/3 max-h-48 flex items-center justify-center shadow-xs"
               >
                 <img
-                  src={record.fileDataUrl}
-                  alt={record.subcategory || record.category}
+                  src={imageAttachments[0].fileDataUrl || imageAttachments[0].fileUrl}
+                  alt={imageAttachments[0].fileName}
                   className="w-full h-full object-cover transition-transform duration-300 group-hover/img:scale-105"
                   referrerPolicy="no-referrer"
                 />
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center gap-2">
                   <span className="px-3 py-1.5 rounded-full bg-white text-red-600 border border-red-600 text-xs font-bold flex items-center gap-1.5 shadow-lg">
                     <Eye className="w-3.5 h-3.5" />
-                    <span>Ver Foto Completa</span>
+                    <span>Ver Imagen</span>
                   </span>
                 </div>
+                {imageAttachments[0].label && (
+                  <div className="absolute bottom-2 left-2 px-2.5 py-0.5 rounded-lg bg-red-600 text-white text-[10px] font-black shadow-md">
+                    {imageAttachments[0].label}
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="flex items-center justify-between gap-2 p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-8 h-8 rounded-xl bg-red-50 dark:bg-red-950/40 text-red-600 flex items-center justify-center shrink-0 border border-red-100 dark:border-red-900">
-                    <FileText className="w-4 h-4" />
+            )}
+
+            {imageAttachments.length === 2 && (
+              <div className="grid grid-cols-2 gap-2">
+                {imageAttachments.map((imgAtt, i) => (
+                  <div
+                    key={imgAtt.id || i}
+                    onClick={() => onViewPhoto(record, attachments.indexOf(imgAtt))}
+                    className="relative rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 cursor-pointer group/img aspect-4/3 max-h-36 flex items-center justify-center shadow-xs"
+                  >
+                    <img
+                      src={imgAtt.fileDataUrl || imgAtt.fileUrl}
+                      alt={imgAtt.fileName}
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover/img:scale-105"
+                      referrerPolicy="no-referrer"
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
+                      <Eye className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="absolute bottom-1.5 left-1.5 px-2 py-0.5 rounded-lg bg-red-600 text-white text-[9px] font-black shadow-md">
+                      {imgAtt.label || (i === 0 ? 'Frente' : 'Dorso')}
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
-                      {record.fileName || 'Documento adjunto'}
-                    </p>
-                    <p className="text-[10px] text-slate-500">
-                      {formatFileSize(record.fileSize)}
-                    </p>
-                  </div>
+                ))}
+              </div>
+            )}
+
+            {imageAttachments.length >= 3 && (
+              <div className="space-y-1.5">
+                <div className="grid grid-cols-3 gap-1.5">
+                  {imageAttachments.slice(0, 3).map((imgAtt, i) => (
+                    <div
+                      key={imgAtt.id || i}
+                      onClick={() => onViewPhoto(record, attachments.indexOf(imgAtt))}
+                      className="relative rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 cursor-pointer group/img aspect-square max-h-28 flex items-center justify-center shadow-xs"
+                    >
+                      <img
+                        src={imgAtt.fileDataUrl || imgAtt.fileUrl}
+                        alt={imgAtt.fileName}
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover/img:scale-105"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
+                        <Eye className="w-3.5 h-3.5 text-white" />
+                      </div>
+                      {imgAtt.label && (
+                        <div className="absolute bottom-1 left-1 px-1.5 py-0.2 rounded-md bg-red-600 text-white text-[8px] font-black">
+                          {imgAtt.label}
+                        </div>
+                      )}
+                      {i === 2 && imageAttachments.length > 3 && (
+                        <div className="absolute inset-0 bg-black/70 flex items-center justify-center text-white text-xs font-black">
+                          +{imageAttachments.length - 2} más
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
+              </div>
+            )}
+
+            {/* List of Attached Documents / Files */}
+            <div className="space-y-1.5">
+              {attachments.map((att, attIdx) => {
+                const isAttImage =
+                  att.fileType?.startsWith('image/') ||
+                  (att.fileDataUrl && att.fileDataUrl.startsWith('data:image/'));
+
+                return (
+                  <div
+                    key={att.id || attIdx}
+                    className="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 hover:border-slate-300 transition-colors"
+                  >
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <div className="w-7 h-7 rounded-lg bg-red-50 dark:bg-red-950/40 text-red-600 flex items-center justify-center shrink-0 border border-red-100 dark:border-red-900">
+                        {isAttImage ? <ImageIcon className="w-3.5 h-3.5" /> : <FileText className="w-3.5 h-3.5" />}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {att.label && (
+                            <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded-md bg-red-600 text-white shrink-0">
+                              {att.label}
+                            </span>
+                          )}
+                          <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                            {att.fileName || `Documento ${attIdx + 1}`}
+                          </p>
+                        </div>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                          {formatFileSize(att.fileSize)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      {isAttImage && (
+                        <button
+                          type="button"
+                          onClick={() => onViewPhoto(record, attIdx)}
+                          className="p-1.5 rounded-lg bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:text-red-600 transition-colors cursor-pointer"
+                          title="Ver documento"
+                        >
+                          <Eye className="w-3 h-3" />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadAttachment(att)}
+                        className="p-1.5 rounded-lg bg-white dark:bg-slate-900 text-red-600 border border-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer shadow-2xs"
+                        title="Descargar archivo"
+                      >
+                        <Download className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Admin shortcut to add more files to this subcategory */}
+            {isAdmin && (
+              <div className="pt-0.5 flex justify-end">
                 <button
-                  onClick={handleDownload}
-                  className="p-1.5 rounded-xl bg-white dark:bg-slate-900 text-red-600 border border-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors shrink-0 cursor-pointer shadow-2xs"
-                  title="Descargar archivo"
+                  type="button"
+                  onClick={() => onEdit(record)}
+                  className="text-[11px] font-bold text-red-600 hover:underline flex items-center gap-1 cursor-pointer"
                 >
-                  <Download className="w-3.5 h-3.5" />
+                  <Plus className="w-3 h-3" />
+                  <span>Adjuntar más archivos</span>
                 </button>
               </div>
             )}
           </div>
-        ) : (
-          !isCard && isAdmin && (
-            <button
-              onClick={() => onEdit(record)}
-              className="w-full mb-3 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-dashed border-slate-200 dark:border-slate-700 hover:border-red-400 text-center text-xs text-slate-500 dark:text-slate-400 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <Paperclip className="w-3.5 h-3.5 text-red-500" />
-              <span>Adjuntar foto o archivo</span>
-            </button>
-          )
+        )}
+
+        {/* Empty state when no files and admin */}
+        {attachments.length === 0 && isAdmin && !isCard && (
+          <button
+            onClick={() => onEdit(record)}
+            className="w-full mb-3.5 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-dashed border-slate-200 dark:border-slate-700 hover:border-red-400 text-center text-xs text-slate-500 dark:text-slate-400 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <Paperclip className="w-3.5 h-3.5 text-red-500" />
+            <span>Adjuntar fotos o archivos a esta subcategoría</span>
+          </button>
+        )}
+
+        {/* ================= TO-DO / CHECKLIST EN TODAS LAS SUBCATEGORÍAS ================= */}
+        {(todos.length > 0 || isAdmin) && (
+          <div className="mb-3 p-3 rounded-2xl bg-slate-50/70 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/70 space-y-2">
+            {/* Checklist Header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <ListTodo className="w-3.5 h-3.5 text-red-500" />
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                  Tareas To-Do:
+                </span>
+              </div>
+              {todos.length > 0 && (
+                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                  {completedTodosCount}/{todos.length} listas
+                </span>
+              )}
+            </div>
+
+            {/* Progress Bar if todos exist */}
+            {todos.length > 0 && (
+              <div className="w-full h-1.5 bg-slate-200/80 dark:bg-slate-700/80 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-emerald-500 rounded-full transition-all duration-300"
+                  style={{ width: `${(completedTodosCount / todos.length) * 100}%` }}
+                />
+              </div>
+            )}
+
+            {/* Checklist items */}
+            {todos.length > 0 && (
+              <div className="space-y-1 pt-0.5">
+                {todos.map((todo) => (
+                  <div
+                    key={todo.id}
+                    onClick={() => handleToggleTodo(todo.id)}
+                    className={`flex items-start gap-2 p-1.5 rounded-xl transition-all cursor-pointer select-none text-xs ${
+                      todo.completed
+                        ? 'text-slate-400 dark:text-slate-500 bg-slate-100/50 dark:bg-slate-900/30'
+                        : 'text-slate-800 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleTodo(todo.id);
+                      }}
+                      className={`p-0.5 mt-0.5 rounded-md transition-transform active:scale-90 shrink-0 ${
+                        todo.completed ? 'text-emerald-600' : 'text-slate-400 hover:text-red-600'
+                      }`}
+                    >
+                      {todo.completed ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 fill-emerald-500/10 stroke-[2.5]" />
+                      ) : (
+                        <Square className="w-3.5 h-3.5 stroke-[2]" />
+                      )}
+                    </button>
+                    <span className={`flex-1 break-words font-medium ${todo.completed ? 'line-through' : ''}`}>
+                      {todo.text}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Quick Add To-Do item for this subcategory */}
+            {isAdmin && (
+              <div className="pt-1">
+                {!showAddTodoInput ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowAddTodoInput(true)}
+                    className="text-[11px] font-bold text-red-600 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>Agregar tarea pendiente</span>
+                  </button>
+                ) : (
+                  <form onSubmit={handleAddQuickTodo} className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      value={newQuickTodoText}
+                      onChange={(e) => setNewQuickTodoText(e.target.value)}
+                      placeholder="Nueva tarea para esta subcategoría..."
+                      autoFocus
+                      className="flex-1 px-2.5 py-1 text-xs rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white outline-none"
+                    />
+                    <button
+                      type="submit"
+                      disabled={!newQuickTodoText.trim()}
+                      className="px-2.5 py-1 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white font-bold text-xs cursor-pointer"
+                    >
+                      Guardar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddTodoInput(false)}
+                      className="p-1 text-slate-400 hover:text-slate-600"
+                    >
+                      ✕
+                    </button>
+                  </form>
+                )}
+              </div>
+            )}
+          </div>
         )}
       </div>
 
@@ -247,13 +536,13 @@ export const PersonalRecordCard: React.FC<PersonalRecordCardProps> = ({
             </button>
           )}
 
-          {record.fileDataUrl && isImage && (
+          {attachments.length > 0 && (
             <button
-              onClick={() => onViewPhoto(record)}
+              onClick={() => onViewPhoto(record, 0)}
               className="text-[11px] font-bold text-red-600 hover:underline flex items-center gap-1 cursor-pointer"
             >
-              <ImageIcon className="w-3 h-3" />
-              <span>Foto</span>
+              <Paperclip className="w-3 h-3" />
+              <span>{attachments.length} {attachments.length === 1 ? 'doc' : 'docs'}</span>
             </button>
           )}
         </div>
@@ -261,4 +550,3 @@ export const PersonalRecordCard: React.FC<PersonalRecordCardProps> = ({
     </div>
   );
 };
-

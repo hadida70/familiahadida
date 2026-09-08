@@ -5,6 +5,7 @@ import {
   GroceryItem,
   Member,
   PersonalRecord,
+  RecordAttachment,
   DataCategory,
   PushNotification,
   CalendarTask,
@@ -22,6 +23,7 @@ interface UseWebSocketReturn {
   login: (memberIdOrUsername: string, pin: string) => Promise<{ success: boolean; error?: string; user?: Member }>;
   logout: () => void;
   uploadFile: (file: File) => Promise<{ fileName: string; fileUrl: string; fileType: string; fileSize: number } | null>;
+  uploadMultipleFiles: (files: File[]) => Promise<RecordAttachment[]>;
   addItem: (item: Partial<GroceryItem>) => Promise<void>;
   updateItem: (id: string, updates: Partial<GroceryItem>) => Promise<void>;
   deleteItem: (id: string) => Promise<void>;
@@ -547,7 +549,7 @@ export function useWebSocket(): UseWebSocketReturn {
     localStorage.removeItem('hadida_family_auth_role');
   };
 
-  // Upload file helper
+  // Upload file helper (single file)
   const uploadFile = async (file: File) => {
     try {
       const formData = new FormData();
@@ -574,6 +576,38 @@ export function useWebSocket(): UseWebSocketReturn {
     } catch (err) {
       console.error('File upload error:', err);
       return null;
+    }
+  };
+
+  // Upload multiple files helper
+  const uploadMultipleFiles = async (files: File[]) => {
+    try {
+      if (!files || files.length === 0) return [];
+      const formData = new FormData();
+      files.forEach((f) => formData.append('files', f));
+
+      const currentToken = token || localStorage.getItem('hadida_family_auth_token');
+      const headers: Record<string, string> = {};
+      if (currentToken) {
+        headers['Authorization'] = `Bearer ${currentToken}`;
+      }
+
+      const res = await fetch('/api/upload-multiple', {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json();
+        throw new Error(errJson.error || 'Error al subir archivos múltiples');
+      }
+
+      const json = await res.json();
+      return json.files || [];
+    } catch (err) {
+      console.error('Multiple file upload error:', err);
+      return [];
     }
   };
 
@@ -1043,6 +1077,7 @@ export function useWebSocket(): UseWebSocketReturn {
     login,
     logout,
     uploadFile,
+    uploadMultipleFiles,
     addItem,
     updateItem,
     deleteItem,

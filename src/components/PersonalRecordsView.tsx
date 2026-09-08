@@ -20,7 +20,8 @@ interface PersonalRecordsViewProps {
   onAddSubcategory?: (categoryId: string, subcategoryName: string) => Promise<void>;
   onEditRecord: (record: PersonalRecord) => void;
   onDeleteRecord: (id: string) => void;
-  onViewPhoto: (record: PersonalRecord) => void;
+  onViewPhoto: (record: PersonalRecord, attachmentIndex?: number) => void;
+  onUpdateRecordTodos?: (recordId: string, todos: any[]) => void;
 }
 
 export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
@@ -36,6 +37,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
   onEditRecord,
   onDeleteRecord,
   onViewPhoto,
+  onUpdateRecordTodos,
 }) => {
   const [selectedMemberId, setSelectedMemberId] = useState<string>(activeMember?.id || 'all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -311,6 +313,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
                 onDelete={onDeleteRecord}
                 onViewPhoto={onViewPhoto}
                 onSendRecord={onOpenSendRecord}
+                onUpdateRecordTodos={onUpdateRecordTodos}
               />
             );
           })}

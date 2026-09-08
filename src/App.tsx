@@ -45,6 +45,7 @@ export default function App() {
     login,
     logout,
     uploadFile,
+    uploadMultipleFiles,
     addItem,
     updateItem,
     deleteItem,
@@ -113,7 +114,7 @@ export default function App() {
   const [isSendPersonalRecordOpen, setIsSendPersonalRecordOpen] = useState(false);
   const [sendingPersonalRecord, setSendingPersonalRecord] = useState<PersonalRecord | null>(null);
   const [editingPersonalRecord, setEditingPersonalRecord] = useState<PersonalRecord | null>(null);
-  const [viewingPhotoRecord, setViewingPhotoRecord] = useState<PersonalRecord | null>(null);
+  const [viewingPhotoState, setViewingPhotoState] = useState<{ record: PersonalRecord; initialIndex: number } | null>(null);
 
   // Calendar Tasks Modals
   const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
@@ -220,8 +221,9 @@ export default function App() {
 
   // Personal Records Handlers
   const handleSavePersonalRecord = (record: Partial<PersonalRecord>) => {
-    if (editingPersonalRecord) {
-      updatePersonalRecord(editingPersonalRecord.id, record);
+    const targetId = editingPersonalRecord?.id || record.id;
+    if (targetId) {
+      updatePersonalRecord(targetId, record);
       setEditingPersonalRecord(null);
     } else {
       addPersonalRecord(record);
@@ -532,7 +534,12 @@ export default function App() {
             onAddSubcategory={addSubcategory}
             onEditRecord={handleEditPersonalRecord}
             onDeleteRecord={deletePersonalRecord}
-            onViewPhoto={(record) => setViewingPhotoRecord(record)}
+            onViewPhoto={(record, attachmentIndex) =>
+              setViewingPhotoState({ record, initialIndex: attachmentIndex || 0 })
+            }
+            onUpdateRecordTodos={(recordId, todos) =>
+              updatePersonalRecord(recordId, { todos })
+            }
           />
         ) : activeTab === 'categories' ? (
           /* PANEL DE ADMINISTRACIÓN DE CATEGORÍAS Y SUBCATEGORÍAS */
@@ -644,14 +651,29 @@ export default function App() {
         }}
         onSave={handleSavePersonalRecord}
         onUploadFile={uploadFile}
+        onUploadFiles={uploadMultipleFiles}
         members={data.members}
         activeMember={activeMember}
         editingRecord={editingPersonalRecord}
+        records={data.personalRecords || []}
         categories={data.dataCategories || []}
         initialCategory={addRecordPreset?.category}
         initialSubcategory={addRecordPreset?.subcategory}
         onOpenManageCategories={() => setIsManageCategoriesOpen(true)}
         onAddSubcategory={addSubcategory}
+        onPreviewAttachment={(att) =>
+          setViewingPhotoState({
+            record: {
+              id: 'temp_preview',
+              memberId: activeMember?.id || 'member_jaime',
+              category: 'Vista Previa',
+              subcategory: att.fileName,
+              attachments: [att],
+              createdAt: new Date().toISOString(),
+            },
+            initialIndex: 0,
+          })
+        }
       />
 
       {/* Categories and Subcategories Management Modal */}
@@ -679,13 +701,16 @@ export default function App() {
         records={data.personalRecords || []}
         members={data.members}
         onSendAlert={sendPushAlert}
-        onViewPhoto={(record) => setViewingPhotoRecord(record)}
+        onViewPhoto={(record, attachmentIndex) =>
+          setViewingPhotoState({ record, initialIndex: attachmentIndex || 0 })
+        }
       />
 
       {/* Full screen photo / document lightbox */}
       <PhotoLightboxModal
-        record={viewingPhotoRecord}
-        onClose={() => setViewingPhotoRecord(null)}
+        record={viewingPhotoState?.record || null}
+        initialIndex={viewingPhotoState?.initialIndex || 0}
+        onClose={() => setViewingPhotoState(null)}
         onSendRecord={(record) => {
           setSendingPersonalRecord(record);
           setIsSendPersonalRecordOpen(true);

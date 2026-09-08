@@ -93,6 +93,8 @@ export function initDatabase() {
       file_size INTEGER DEFAULT 0,
       file_url TEXT DEFAULT '',
       file_data_url TEXT DEFAULT '',
+      attachments_json TEXT DEFAULT '[]',
+      todos_json TEXT DEFAULT '[]',
       card_number TEXT DEFAULT '',
       card_holder TEXT DEFAULT '',
       card_exp TEXT DEFAULT '',
@@ -105,6 +107,17 @@ export function initDatabase() {
       updated_at TEXT
     );
   `);
+
+  try {
+    db.exec(`ALTER TABLE personal_records ADD COLUMN attachments_json TEXT DEFAULT '[]'`);
+  } catch {
+    // Column already exists
+  }
+  try {
+    db.exec(`ALTER TABLE personal_records ADD COLUMN todos_json TEXT DEFAULT '[]'`);
+  } catch {
+    // Column already exists
+  }
 
   // 5. Data Categories table
   db.exec(`
@@ -520,7 +533,7 @@ export function getAllAppData(): AppData {
   const usersRows = db.prepare('SELECT id, name, username, role, avatar_color as avatarColor, avatar_initial as avatarInitial, icon_name as iconName, created_at as createdAt FROM users ORDER BY name ASC').all() as Member[];
   const listsRows = db.prepare('SELECT id, name, icon, color, description, created_by as createdBy, created_at as createdAt FROM lists ORDER BY created_at ASC').all() as CustomList[];
   const itemsRows = db.prepare('SELECT id, list_id as listId, title, category, quantity, notes, assigned_to_id as assignedToId, completed, completed_at as completedAt, created_by as createdBy, created_at as createdAt, updated_at as updatedAt, urgent FROM grocery_items ORDER BY created_at DESC').all() as any[];
-  const recordsRows = db.prepare('SELECT id, member_id as memberId, category, subcategory, title, notes, file_name as fileName, file_type as fileType, file_size as fileSize, file_url as fileUrl, file_data_url as fileDataUrl, card_number as cardNumber, card_holder as cardHolder, card_exp as cardExp, card_cvc as cardCvc, card_bank as cardBank, card_brand as cardBrand, card_theme as cardTheme, card_account_no as cardAccountNo, created_at as createdAt, updated_at as updatedAt FROM personal_records ORDER BY created_at DESC').all() as any[];
+  const recordsRows = db.prepare('SELECT id, member_id as memberId, category, subcategory, title, notes, file_name as fileName, file_type as fileType, file_size as fileSize, file_url as fileUrl, file_data_url as fileDataUrl, attachments_json as attachmentsJson, todos_json as todosJson, card_number as cardNumber, card_holder as cardHolder, card_exp as cardExp, card_cvc as cardCvc, card_bank as cardBank, card_brand as cardBrand, card_theme as cardTheme, card_account_no as cardAccountNo, created_at as createdAt, updated_at as updatedAt FROM personal_records ORDER BY created_at DESC').all() as any[];
   const catRows = db.prepare('SELECT id, name, icon, color, description, subcategories_json, is_default as isDefault, created_at as createdAt FROM data_categories ORDER BY is_default DESC, name ASC').all() as any[];
   const taskRows = db.prepare('SELECT id, title, description, date, time, assigned_to_id as assignedToId, completed, completed_at as completedAt, category, urgent, created_at as createdAt, updated_at as updatedAt FROM calendar_tasks ORDER BY date ASC, time ASC').all() as any[];
   const contactRows = db.prepare('SELECT id, name, phone, email, notes, address, place_name as placeName, created_at as createdAt, updated_at as updatedAt FROM contacts ORDER BY name ASC').all() as Contact[];
@@ -531,7 +544,68 @@ export function getAllAppData(): AppData {
     members: usersRows,
     lists: listsRows,
     items: itemsRows.map((it) => ({ ...it, completed: Boolean(it.completed), urgent: Boolean(it.urgent) })),
-    personalRecords: recordsRows,
+    personalRecords: recordsRows.map((r) => {
+      let attachments = [];
+      if (r.attachmentsJson) {
+        try {
+          attachments = JSON.parse(r.attachmentsJson);
+        } catch {
+          attachments = [];
+        }
+      }
+      if (!Array.isArray(attachments) || attachments.length === 0) {
+        if (r.fileDataUrl || r.fileUrl) {
+          attachments = [{
+            id: 'att_' + r.id,
+            fileName: r.fileName || 'Documento adjunto',
+            fileType: r.fileType || '',
+            fileSize: r.fileSize || 0,
+            fileUrl: r.fileUrl || '',
+            fileDataUrl: r.fileDataUrl || '',
+          }];
+        } else {
+          attachments = [];
+        }
+      }
+
+      let todos = [];
+      if (r.todosJson) {
+        try {
+          todos = JSON.parse(r.todosJson);
+        } catch {
+          todos = [];
+        }
+      }
+      if (!Array.isArray(todos)) {
+        todos = [];
+      }
+
+      return {
+        id: r.id,
+        memberId: r.memberId,
+        category: r.category,
+        subcategory: r.subcategory,
+        title: r.title,
+        notes: r.notes,
+        attachments,
+        fileName: r.fileName || (attachments[0]?.fileName || ''),
+        fileType: r.fileType || (attachments[0]?.fileType || ''),
+        fileSize: r.fileSize || (attachments[0]?.fileSize || 0),
+        fileUrl: r.fileUrl || (attachments[0]?.fileUrl || ''),
+        fileDataUrl: r.fileDataUrl || (attachments[0]?.fileDataUrl || ''),
+        todos,
+        cardNumber: r.cardNumber,
+        cardHolder: r.cardHolder,
+        cardExp: r.cardExp,
+        cardCvc: r.cardCvc,
+        cardBank: r.cardBank,
+        cardBrand: r.cardBrand,
+        cardTheme: r.cardTheme,
+        cardAccountNo: r.cardAccountNo,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+      };
+    }),
     dataCategories: catRows.map((c) => ({
       id: c.id,
       name: c.name,
@@ -704,9 +778,31 @@ export function deleteCustomList(id: string): boolean {
 
 // Personal Records / Documents
 export function insertPersonalRecord(record: PersonalRecord) {
+  const attachments = record.attachments && record.attachments.length > 0
+    ? record.attachments
+    : (record.fileDataUrl || record.fileUrl
+        ? [{
+            id: 'att_' + Date.now(),
+            fileName: record.fileName || 'Documento adjunto',
+            fileType: record.fileType || '',
+            fileSize: record.fileSize || 0,
+            fileUrl: record.fileUrl || '',
+            fileDataUrl: record.fileDataUrl || '',
+          }]
+        : []);
+
+  const firstAtt = attachments[0];
+  const fileName = firstAtt ? firstAtt.fileName : (record.fileName || '');
+  const fileType = firstAtt ? firstAtt.fileType || '' : (record.fileType || '');
+  const fileSize = firstAtt ? firstAtt.fileSize || 0 : (record.fileSize || 0);
+  const fileUrl = firstAtt ? firstAtt.fileUrl || '' : (record.fileUrl || '');
+  const fileDataUrl = firstAtt ? firstAtt.fileDataUrl || '' : (record.fileDataUrl || '');
+  const attachmentsJson = JSON.stringify(attachments);
+  const todosJson = JSON.stringify(record.todos || []);
+
   db.prepare(`
-    INSERT INTO personal_records (id, member_id, category, subcategory, title, notes, file_name, file_type, file_size, file_url, file_data_url, card_number, card_holder, card_exp, card_cvc, card_bank, card_brand, card_theme, card_account_no, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO personal_records (id, member_id, category, subcategory, title, notes, file_name, file_type, file_size, file_url, file_data_url, attachments_json, todos_json, card_number, card_holder, card_exp, card_cvc, card_bank, card_brand, card_theme, card_account_no, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     record.id,
     record.memberId,
@@ -714,11 +810,13 @@ export function insertPersonalRecord(record: PersonalRecord) {
     record.subcategory,
     record.title || '',
     record.notes || '',
-    record.fileName || '',
-    record.fileType || '',
-    record.fileSize || 0,
-    record.fileUrl || '',
-    record.fileDataUrl || '',
+    fileName,
+    fileType,
+    fileSize,
+    fileUrl,
+    fileDataUrl,
+    attachmentsJson,
+    todosJson,
     record.cardNumber || '',
     record.cardHolder || '',
     record.cardExp || '',
@@ -741,11 +839,46 @@ export function updatePersonalRecord(id: string, updates: Partial<PersonalRecord
   const subcategory = updates.subcategory !== undefined ? updates.subcategory : current.subcategory;
   const title = updates.title !== undefined ? updates.title : current.title;
   const notes = updates.notes !== undefined ? updates.notes : current.notes;
-  const fileName = updates.fileName !== undefined ? updates.fileName : current.file_name;
-  const fileType = updates.fileType !== undefined ? updates.fileType : current.file_type;
-  const fileSize = updates.fileSize !== undefined ? updates.fileSize : current.file_size;
-  const fileUrl = updates.fileUrl !== undefined ? updates.fileUrl : current.file_url;
-  const fileDataUrl = updates.fileDataUrl !== undefined ? updates.fileDataUrl : current.file_data_url;
+
+  let currentAttachments = [];
+  if (current.attachments_json) {
+    try {
+      currentAttachments = JSON.parse(current.attachments_json);
+    } catch {
+      currentAttachments = [];
+    }
+  }
+
+  const attachments = updates.attachments !== undefined
+    ? updates.attachments
+    : (currentAttachments.length > 0 ? currentAttachments : (current.file_data_url || current.file_url ? [{
+        id: 'att_' + current.id,
+        fileName: current.file_name || '',
+        fileType: current.file_type || '',
+        fileSize: current.file_size || 0,
+        fileUrl: current.file_url || '',
+        fileDataUrl: current.file_data_url || '',
+      }] : []));
+
+  const firstAtt = attachments[0];
+  const fileName = firstAtt ? firstAtt.fileName : (updates.fileName !== undefined ? updates.fileName : current.file_name);
+  const fileType = firstAtt ? firstAtt.fileType || '' : (updates.fileType !== undefined ? updates.fileType : current.file_type);
+  const fileSize = firstAtt ? firstAtt.fileSize || 0 : (updates.fileSize !== undefined ? updates.fileSize : current.file_size);
+  const fileUrl = firstAtt ? firstAtt.fileUrl || '' : (updates.fileUrl !== undefined ? updates.fileUrl : current.file_url);
+  const fileDataUrl = firstAtt ? firstAtt.fileDataUrl || '' : (updates.fileDataUrl !== undefined ? updates.fileDataUrl : current.file_data_url);
+  const attachmentsJson = JSON.stringify(attachments);
+
+  let currentTodos = [];
+  if (current.todos_json) {
+    try {
+      currentTodos = JSON.parse(current.todos_json);
+    } catch {
+      currentTodos = [];
+    }
+  }
+  const todos = updates.todos !== undefined ? updates.todos : currentTodos;
+  const todosJson = JSON.stringify(todos);
+
   const cardNumber = updates.cardNumber !== undefined ? updates.cardNumber : current.card_number;
   const cardHolder = updates.cardHolder !== undefined ? updates.cardHolder : current.card_holder;
   const cardExp = updates.cardExp !== undefined ? updates.cardExp : current.card_exp;
@@ -758,7 +891,7 @@ export function updatePersonalRecord(id: string, updates: Partial<PersonalRecord
 
   db.prepare(`
     UPDATE personal_records
-    SET member_id = ?, category = ?, subcategory = ?, title = ?, notes = ?, file_name = ?, file_type = ?, file_size = ?, file_url = ?, file_data_url = ?, card_number = ?, card_holder = ?, card_exp = ?, card_cvc = ?, card_bank = ?, card_brand = ?, card_theme = ?, card_account_no = ?, updated_at = ?
+    SET member_id = ?, category = ?, subcategory = ?, title = ?, notes = ?, file_name = ?, file_type = ?, file_size = ?, file_url = ?, file_data_url = ?, attachments_json = ?, todos_json = ?, card_number = ?, card_holder = ?, card_exp = ?, card_cvc = ?, card_bank = ?, card_brand = ?, card_theme = ?, card_account_no = ?, updated_at = ?
     WHERE id = ?
   `).run(
     memberId,
@@ -771,6 +904,8 @@ export function updatePersonalRecord(id: string, updates: Partial<PersonalRecord
     fileSize,
     fileUrl,
     fileDataUrl,
+    attachmentsJson,
+    todosJson,
     cardNumber,
     cardHolder,
     cardExp,
@@ -790,11 +925,13 @@ export function updatePersonalRecord(id: string, updates: Partial<PersonalRecord
     subcategory,
     title,
     notes,
+    attachments,
     fileName,
     fileType,
     fileSize,
     fileUrl,
     fileDataUrl,
+    todos,
     cardNumber,
     cardHolder,
     cardExp,
@@ -808,10 +945,24 @@ export function updatePersonalRecord(id: string, updates: Partial<PersonalRecord
   };
 }
 
-export function deletePersonalRecord(id: string): { success: boolean; fileUrl?: string } {
-  const current = db.prepare('SELECT file_url FROM personal_records WHERE id = ?').get(id) as any;
+export function deletePersonalRecord(id: string): { success: boolean; fileUrls?: string[] } {
+  const current = db.prepare('SELECT file_url, attachments_json FROM personal_records WHERE id = ?').get(id) as any;
+  const fileUrls: string[] = [];
+  if (current?.file_url) fileUrls.push(current.file_url);
+  if (current?.attachments_json) {
+    try {
+      const atts = JSON.parse(current.attachments_json);
+      if (Array.isArray(atts)) {
+        atts.forEach((a) => {
+          if (a.fileUrl && !fileUrls.includes(a.fileUrl)) {
+            fileUrls.push(a.fileUrl);
+          }
+        });
+      }
+    } catch {}
+  }
   const res = db.prepare('DELETE FROM personal_records WHERE id = ?').run(id);
-  return { success: res.changes > 0, fileUrl: current?.file_url };
+  return { success: res.changes > 0, fileUrls };
 }
 
 // Data Categories
