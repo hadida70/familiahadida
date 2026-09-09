@@ -17,6 +17,7 @@ import {
   CalendarTask,
   Contact,
   TodoItem,
+  PasswordItem,
 } from './src/types.ts';
 import {
   db,
@@ -54,6 +55,9 @@ import {
   updateTodo,
   deleteTodo,
   clearCompletedTodos,
+  insertPassword,
+  updatePassword,
+  deletePassword,
   insertNotification,
   markNotificationsAsRead,
 } from './database.ts';
@@ -777,6 +781,76 @@ async function startServer() {
     res.json({ success: true });
   });
 
+  // ================= PASSWORDS & CREDENTIALS ROUTES =================
+
+  // GET /api/passwords
+  app.get('/api/passwords', (_req, res) => {
+    const data = getAllAppData();
+    res.json(data.passwords || []);
+  });
+
+  // POST /api/passwords - Create password item
+  app.post('/api/passwords', (req, res) => {
+    const { website, email, password, notes, category, memberId } = req.body;
+    if (!website || !website.trim() || !password || !password.trim()) {
+      return res.status(400).json({ error: 'La página web y la contraseña son obligatorias.' });
+    }
+
+    const newPassword: PasswordItem = {
+      id: 'pwd_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+      website: website.trim(),
+      email: email ? email.trim() : '',
+      password: password.trim(),
+      notes: notes ? notes.trim() : '',
+      category: category ? category.trim() : 'General',
+      memberId: memberId || 'all',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    insertPassword(newPassword);
+
+    const notif: PushNotification = {
+      id: 'notif_' + Date.now(),
+      recipientId: 'all',
+      title: '🔐 Nueva Contraseña Guardada',
+      message: `Se registró acceso para: ${newPassword.website} (${newPassword.email || 'Sin correo'})`,
+      timestamp: new Date().toISOString(),
+      read: false,
+      type: 'password_added',
+    };
+    insertNotification(notif);
+
+    broadcast('PASSWORD_ADDED', { password: newPassword });
+    broadcast('PUSH_NOTIFICATION', { notification: notif });
+
+    res.status(201).json(newPassword);
+  });
+
+  // PUT /api/passwords/:id - Update password item
+  app.put('/api/passwords/:id', (req, res) => {
+    const { id } = req.params;
+    const updated = updatePassword(id, req.body);
+    if (!updated) {
+      return res.status(404).json({ error: 'Contraseña no encontrada' });
+    }
+
+    broadcast('PASSWORD_UPDATED', { password: updated });
+    res.json(updated);
+  });
+
+  // DELETE /api/passwords/:id - Delete password item
+  app.delete('/api/passwords/:id', (req, res) => {
+    const { id } = req.params;
+    const success = deletePassword(id);
+    if (!success) {
+      return res.status(404).json({ error: 'Contraseña no encontrada' });
+    }
+
+    broadcast('PASSWORD_DELETED', { passwordId: id });
+    res.json({ success: true, passwordId: id });
+  });
+
   // ================= PERSONAL RECORDS & DOCUMENTS ROUTES =================
 
   // GET /api/personal-records - View documents (Available for all authenticated members)
@@ -793,6 +867,7 @@ async function startServer() {
       subcategory,
       title,
       notes,
+      recordType,
       attachments,
       fileName,
       fileType,
@@ -804,6 +879,7 @@ async function startServer() {
       cardHolder,
       cardExp,
       cardCvc,
+      cardAtmPin,
       cardBank,
       cardBrand,
       cardTheme,
@@ -821,6 +897,7 @@ async function startServer() {
       subcategory: subcategory.trim(),
       title: title ? title.trim() : subcategory.trim(),
       notes: notes || '',
+      recordType: recordType || (Array.isArray(attachments) && attachments.length > 0 ? 'document' : (Array.isArray(todos) && todos.length > 0 ? 'list' : 'document')),
       attachments: Array.isArray(attachments) ? attachments : [],
       fileName: fileName || '',
       fileType: fileType || '',
@@ -832,6 +909,7 @@ async function startServer() {
       cardHolder: cardHolder || '',
       cardExp: cardExp || '',
       cardCvc: cardCvc || '',
+      cardAtmPin: cardAtmPin || '',
       cardBank: cardBank || '',
       cardBrand: cardBrand || undefined,
       cardTheme: cardTheme || 'black_vip',

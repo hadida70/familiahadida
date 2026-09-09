@@ -85,8 +85,14 @@ export const SendPersonalRecordModal: React.FC<SendPersonalRecordModalProps> = (
       const subcat = activeRecord.subcategory || 'Dato Personal';
 
       if (activeRecord.cardNumber) {
+        const pinStr = activeRecord.cardAtmPin ? ` | PIN Cajero: ${activeRecord.cardAtmPin}` : '';
         setCustomMessage(
-          `💳 Tarjeta: ${activeRecord.cardBank || subcat} (${activeRecord.cardNumber}) | Vence: ${activeRecord.cardExp || 'N/D'} | CVC: ${activeRecord.cardCvc || '•••'} | Titular: ${activeRecord.cardHolder || ownerName}`
+          `💳 Tarjeta: ${activeRecord.cardBank || subcat} (${activeRecord.cardNumber}) | Vence: ${activeRecord.cardExp || 'N/D'} | CVC: ${activeRecord.cardCvc || '•••'}${pinStr} | Titular: ${activeRecord.cardHolder || ownerName}`
+        );
+      } else if (activeRecord.recordType === 'list' || (todos.length > 0 && attachments.length === 0)) {
+        const pendingCount = todos.filter((t) => !t.completed).length;
+        setCustomMessage(
+          `📋 Listado de Ítems compartido: ${cat} - ${subcat} de ${ownerName} (${todos.length} ítems, ${pendingCount} pendientes).`
         );
       } else {
         const attCountStr = attachments.length > 0 ? ` (${attachments.length} archivo${attachments.length > 1 ? 's' : ''} adjunto${attachments.length > 1 ? 's' : ''})` : '';
@@ -106,6 +112,8 @@ export const SendPersonalRecordModal: React.FC<SendPersonalRecordModalProps> = (
     e.preventDefault();
     const title = activeRecord.cardNumber
       ? `💳 Tarjeta: ${activeRecord.cardBank || activeRecord.subcategory}`
+      : activeRecord.recordType === 'list'
+      ? `📋 Listado: ${activeRecord.category} - ${activeRecord.subcategory}`
       : `📁 Dato Personal: ${activeRecord.category} - ${activeRecord.subcategory}`;
     onSendAlert(recipientId, title, customMessage.trim());
     setSentSuccess(true);
@@ -124,8 +132,11 @@ export const SendPersonalRecordModal: React.FC<SendPersonalRecordModalProps> = (
     if (activeRecord.cardNumber) {
       text += `💳 *Nº Tarjeta:* \`${activeRecord.cardNumber}\`\n` +
         `📅 *Vencimiento:* ${activeRecord.cardExp || 'N/D'}\n` +
-        `🔒 *CVC / CVV:* ${activeRecord.cardCvc || '•••'}\n` +
-        `🏦 *Banco/Emisor:* ${activeRecord.cardBank || ''}\n` +
+        `🔒 *CVC / CVV:* ${activeRecord.cardCvc || '•••'}\n`;
+      if (activeRecord.cardAtmPin) {
+        text += `🏧 *PIN Cajero Automático:* \`${activeRecord.cardAtmPin}\`\n`;
+      }
+      text += `🏦 *Banco/Emisor:* ${activeRecord.cardBank || ''}\n` +
         `👤 *Titular:* ${activeRecord.cardHolder || ownerName}\n`;
     }
 
@@ -138,7 +149,7 @@ export const SendPersonalRecordModal: React.FC<SendPersonalRecordModalProps> = (
     }
 
     if (todos.length > 0) {
-      text += `\n📋 *Lista To-Do / Checklist:*\n`;
+      text += `\n📋 *${activeRecord.recordType === 'list' ? 'Listado de Ítems' : 'Lista To-Do / Checklist'}:*\n`;
       todos.forEach((t) => {
         text += `  ${t.completed ? '✅' : '⬜'} ${t.text}\n`;
       });
@@ -159,8 +170,11 @@ export const SendPersonalRecordModal: React.FC<SendPersonalRecordModalProps> = (
     if (activeRecord.cardNumber) {
       text += `Tarjeta Nº: ${activeRecord.cardNumber}\n` +
         `Vencimiento: ${activeRecord.cardExp || ''}\n` +
-        `CVC: ${activeRecord.cardCvc || ''}\n` +
-        `Titular: ${activeRecord.cardHolder || ownerName}\n` +
+        `CVC: ${activeRecord.cardCvc || ''}\n`;
+      if (activeRecord.cardAtmPin) {
+        text += `PIN Cajero Automático: ${activeRecord.cardAtmPin}\n`;
+      }
+      text += `Titular: ${activeRecord.cardHolder || ownerName}\n` +
         `Banco: ${activeRecord.cardBank || ''}\n`;
     }
 
@@ -173,7 +187,7 @@ export const SendPersonalRecordModal: React.FC<SendPersonalRecordModalProps> = (
     }
 
     if (todos.length > 0) {
-      text += `\nLista To-Do:\n`;
+      text += `\n${activeRecord.recordType === 'list' ? 'Listado de Ítems' : 'Lista To-Do'}:\n`;
       todos.forEach((t) => {
         text += `[${t.completed ? 'X' : ' '}] ${t.text}\n`;
       });

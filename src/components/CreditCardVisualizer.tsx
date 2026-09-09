@@ -12,6 +12,7 @@ export interface CreditCardData {
   cardHolder?: string;
   cardExp?: string;
   cardCvc?: string;
+  cardAtmPin?: string;
   cardBank?: string;
   cardBrand?: string;
   cardTheme?: string;
@@ -38,6 +39,7 @@ export const CreditCardVisualizer: React.FC<CreditCardVisualizerProps> = ({
   const cardHolder = (card.cardHolder || 'JAIME HADIDA').toUpperCase();
   const cardExp = card.cardExp || 'MM/AA';
   const cardCvc = card.cardCvc || '•••';
+  const cardAtmPin = card.cardAtmPin || '';
   const cardBank = (card.cardBank || 'ISRACARD').toUpperCase();
 
   // Format card number with spaces every 4 digits on a single line
@@ -77,14 +79,21 @@ export const CreditCardVisualizer: React.FC<CreditCardVisualizerProps> = ({
         {/* Subtle minimalist top border accent */}
         <div className="absolute top-0 left-0 right-0 h-1 bg-slate-900 dark:bg-slate-100" />
 
-        {/* Top Header: Bank / Card Name only, zero logos */}
+        {/* Top Header: Bank / Card Name and optional ATM indicator */}
         <div className="flex items-center justify-between z-10">
           <span className="text-xs sm:text-sm font-black tracking-wider text-slate-900 dark:text-white uppercase truncate">
             {cardBank}
           </span>
-          <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
-            TARJETA
-          </span>
+          <div className="flex items-center gap-1.5">
+            {cardAtmPin && (
+              <span className="text-[9px] font-black px-1.5 py-0.2 rounded-md bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 uppercase tracking-wider">
+                ATM PIN
+              </span>
+            )}
+            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+              TARJETA
+            </span>
+          </div>
         </div>
 
         {/* Center: Card Number on a Single Line */}
@@ -94,7 +103,7 @@ export const CreditCardVisualizer: React.FC<CreditCardVisualizerProps> = ({
           </p>
         </div>
 
-        {/* Bottom Line: Cardholder, Expiry, and CVC in one aligned line */}
+        {/* Bottom Line: Cardholder, Expiry, CVC, and ATM PIN in aligned layout */}
         <div className="flex items-end justify-between gap-2 z-10 pt-2 border-t border-slate-100 dark:border-slate-800/80">
           {/* Cardholder Name */}
           <div className="min-w-0 flex-1">
@@ -106,8 +115,8 @@ export const CreditCardVisualizer: React.FC<CreditCardVisualizerProps> = ({
             </p>
           </div>
 
-          {/* Expiration & CVC together in the same line */}
-          <div className="flex items-center gap-3 shrink-0">
+          {/* Expiration, CVC & ATM PIN */}
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <div className="text-right">
               <span className="block text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase tracking-wider">
                 VENCE
@@ -127,6 +136,20 @@ export const CreditCardVisualizer: React.FC<CreditCardVisualizerProps> = ({
                 {showNumbers ? cardCvc : '•••'}
               </p>
             </div>
+
+            {cardAtmPin && (
+              <>
+                <div className="h-5 w-px bg-slate-200 dark:bg-slate-700" />
+                <div className="text-right">
+                  <span className="block text-[8px] sm:text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+                    PIN CAJERO
+                  </span>
+                  <p className="font-mono text-[11px] sm:text-xs font-black text-emerald-600 dark:text-emerald-400 tracking-widest">
+                    {showNumbers ? cardAtmPin : '••••'}
+                  </p>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -139,7 +162,7 @@ export const CreditCardVisualizer: React.FC<CreditCardVisualizerProps> = ({
             type="button"
             onClick={() => setShowNumbers(!showNumbers)}
             className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-red-500 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
-            title="Mostrar u ocultar números y CVC"
+            title="Mostrar u ocultar números, CVC y PIN"
           >
             {showNumbers ? (
               <>
@@ -149,7 +172,7 @@ export const CreditCardVisualizer: React.FC<CreditCardVisualizerProps> = ({
             ) : (
               <>
                 <Eye className="w-3.5 h-3.5 text-slate-400" />
-                <span>Ver Números</span>
+                <span>Ver Números y PIN</span>
               </>
             )}
           </button>
@@ -193,6 +216,28 @@ export const CreditCardVisualizer: React.FC<CreditCardVisualizerProps> = ({
                 <>
                   <CreditCardIcon className="w-3.5 h-3.5 text-red-500" />
                   <span>Copiar CVC</span>
+                </>
+              )}
+            </button>
+          )}
+
+          {/* Copy ATM PIN */}
+          {cardAtmPin && (
+            <button
+              type="button"
+              onClick={() => handleCopy(cardAtmPin, 'pin')}
+              className="px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 hover:border-emerald-500 text-emerald-700 dark:text-emerald-300 text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
+              title="Copiar Código de Cajero Automático (PIN ATM)"
+            >
+              {copiedField === 'pin' ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-500" />
+                  <span className="text-emerald-600 dark:text-emerald-400">¡PIN Copiado!</span>
+                </>
+              ) : (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Copiar PIN Cajero</span>
                 </>
               )}
             </button>

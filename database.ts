@@ -13,6 +13,7 @@ import {
   CalendarTask,
   Contact,
   TodoItem,
+  PasswordItem,
 } from './src/types.ts';
 
 const DB_PATH = process.env.DATABASE_URL || path.join(process.cwd(), 'database.sqlite');
@@ -88,6 +89,7 @@ export function initDatabase() {
       subcategory TEXT NOT NULL,
       title TEXT DEFAULT '',
       notes TEXT DEFAULT '',
+      record_type TEXT DEFAULT 'document',
       file_name TEXT DEFAULT '',
       file_type TEXT DEFAULT '',
       file_size INTEGER DEFAULT 0,
@@ -99,6 +101,7 @@ export function initDatabase() {
       card_holder TEXT DEFAULT '',
       card_exp TEXT DEFAULT '',
       card_cvc TEXT DEFAULT '',
+      card_atm_pin TEXT DEFAULT '',
       card_bank TEXT DEFAULT '',
       card_brand TEXT DEFAULT '',
       card_theme TEXT DEFAULT 'black_vip',
@@ -115,6 +118,16 @@ export function initDatabase() {
   }
   try {
     db.exec(`ALTER TABLE personal_records ADD COLUMN todos_json TEXT DEFAULT '[]'`);
+  } catch {
+    // Column already exists
+  }
+  try {
+    db.exec(`ALTER TABLE personal_records ADD COLUMN record_type TEXT DEFAULT 'document'`);
+  } catch {
+    // Column already exists
+  }
+  try {
+    db.exec(`ALTER TABLE personal_records ADD COLUMN card_atm_pin TEXT DEFAULT ''`);
   } catch {
     // Column already exists
   }
@@ -194,6 +207,21 @@ export function initDatabase() {
       item_id TEXT,
       list_id TEXT,
       task_id TEXT
+    );
+  `);
+
+  // 10. Passwords table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS passwords (
+      id TEXT PRIMARY KEY,
+      website TEXT NOT NULL,
+      email TEXT NOT NULL,
+      password TEXT NOT NULL,
+      notes TEXT DEFAULT '',
+      category TEXT DEFAULT 'General',
+      member_id TEXT DEFAULT 'all',
+      created_at TEXT NOT NULL,
+      updated_at TEXT
     );
   `);
 
@@ -533,11 +561,12 @@ export function getAllAppData(): AppData {
   const usersRows = db.prepare('SELECT id, name, username, role, avatar_color as avatarColor, avatar_initial as avatarInitial, icon_name as iconName, created_at as createdAt FROM users ORDER BY name ASC').all() as Member[];
   const listsRows = db.prepare('SELECT id, name, icon, color, description, created_by as createdBy, created_at as createdAt FROM lists ORDER BY created_at ASC').all() as CustomList[];
   const itemsRows = db.prepare('SELECT id, list_id as listId, title, category, quantity, notes, assigned_to_id as assignedToId, completed, completed_at as completedAt, created_by as createdBy, created_at as createdAt, updated_at as updatedAt, urgent FROM grocery_items ORDER BY created_at DESC').all() as any[];
-  const recordsRows = db.prepare('SELECT id, member_id as memberId, category, subcategory, title, notes, file_name as fileName, file_type as fileType, file_size as fileSize, file_url as fileUrl, file_data_url as fileDataUrl, attachments_json as attachmentsJson, todos_json as todosJson, card_number as cardNumber, card_holder as cardHolder, card_exp as cardExp, card_cvc as cardCvc, card_bank as cardBank, card_brand as cardBrand, card_theme as cardTheme, card_account_no as cardAccountNo, created_at as createdAt, updated_at as updatedAt FROM personal_records ORDER BY created_at DESC').all() as any[];
+  const recordsRows = db.prepare('SELECT id, member_id as memberId, category, subcategory, title, notes, record_type as recordType, file_name as fileName, file_type as fileType, file_size as fileSize, file_url as fileUrl, file_data_url as fileDataUrl, attachments_json as attachmentsJson, todos_json as todosJson, card_number as cardNumber, card_holder as cardHolder, card_exp as cardExp, card_cvc as cardCvc, card_atm_pin as cardAtmPin, card_bank as cardBank, card_brand as cardBrand, card_theme as cardTheme, card_account_no as cardAccountNo, created_at as createdAt, updated_at as updatedAt FROM personal_records ORDER BY created_at DESC').all() as any[];
   const catRows = db.prepare('SELECT id, name, icon, color, description, subcategories_json, is_default as isDefault, created_at as createdAt FROM data_categories ORDER BY is_default DESC, name ASC').all() as any[];
   const taskRows = db.prepare('SELECT id, title, description, date, time, assigned_to_id as assignedToId, completed, completed_at as completedAt, category, urgent, created_at as createdAt, updated_at as updatedAt FROM calendar_tasks ORDER BY date ASC, time ASC').all() as any[];
   const contactRows = db.prepare('SELECT id, name, phone, email, notes, address, place_name as placeName, created_at as createdAt, updated_at as updatedAt FROM contacts ORDER BY name ASC').all() as Contact[];
   const todoRows = db.prepare('SELECT id, text, completed, assigned_to_id as assignedToId, category, due_date as dueDate, completed_at as completedAt, created_at as createdAt, updated_at as updatedAt FROM todos ORDER BY created_at DESC').all() as any[];
+  const passwordRows = db.prepare('SELECT id, website, email, password, notes, category, member_id as memberId, created_at as createdAt, updated_at as updatedAt FROM passwords ORDER BY created_at DESC').all() as PasswordItem[];
   const notifRows = db.prepare('SELECT id, recipient_id as recipientId, title, message, timestamp, read, type, item_id as itemId, list_id as listId, task_id as taskId FROM notifications ORDER BY timestamp DESC LIMIT 50').all() as any[];
 
   return {
@@ -587,6 +616,7 @@ export function getAllAppData(): AppData {
         subcategory: r.subcategory,
         title: r.title,
         notes: r.notes,
+        recordType: r.recordType || (attachments.length > 0 ? 'document' : todos.length > 0 ? 'list' : 'document'),
         attachments,
         fileName: r.fileName || (attachments[0]?.fileName || ''),
         fileType: r.fileType || (attachments[0]?.fileType || ''),
@@ -598,6 +628,7 @@ export function getAllAppData(): AppData {
         cardHolder: r.cardHolder,
         cardExp: r.cardExp,
         cardCvc: r.cardCvc,
+        cardAtmPin: r.cardAtmPin || '',
         cardBank: r.cardBank,
         cardBrand: r.cardBrand,
         cardTheme: r.cardTheme,
@@ -619,6 +650,7 @@ export function getAllAppData(): AppData {
     calendarTasks: taskRows.map((t) => ({ ...t, completed: Boolean(t.completed), urgent: Boolean(t.urgent) })),
     contacts: contactRows,
     todos: todoRows.map((td) => ({ ...td, completed: Boolean(td.completed) })),
+    passwords: passwordRows,
     notifications: notifRows.map((n) => ({ ...n, read: Boolean(n.read) })),
   };
 }
@@ -800,9 +832,11 @@ export function insertPersonalRecord(record: PersonalRecord) {
   const attachmentsJson = JSON.stringify(attachments);
   const todosJson = JSON.stringify(record.todos || []);
 
+  const recordType = record.recordType || (attachments.length > 0 ? 'document' : (record.todos && record.todos.length > 0 ? 'list' : 'document'));
+
   db.prepare(`
-    INSERT INTO personal_records (id, member_id, category, subcategory, title, notes, file_name, file_type, file_size, file_url, file_data_url, attachments_json, todos_json, card_number, card_holder, card_exp, card_cvc, card_bank, card_brand, card_theme, card_account_no, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO personal_records (id, member_id, category, subcategory, title, notes, record_type, file_name, file_type, file_size, file_url, file_data_url, attachments_json, todos_json, card_number, card_holder, card_exp, card_cvc, card_atm_pin, card_bank, card_brand, card_theme, card_account_no, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     record.id,
     record.memberId,
@@ -810,6 +844,7 @@ export function insertPersonalRecord(record: PersonalRecord) {
     record.subcategory,
     record.title || '',
     record.notes || '',
+    recordType,
     fileName,
     fileType,
     fileSize,
@@ -821,6 +856,7 @@ export function insertPersonalRecord(record: PersonalRecord) {
     record.cardHolder || '',
     record.cardExp || '',
     record.cardCvc || '',
+    record.cardAtmPin || '',
     record.cardBank || '',
     record.cardBrand || '',
     record.cardTheme || 'black_vip',
@@ -839,6 +875,7 @@ export function updatePersonalRecord(id: string, updates: Partial<PersonalRecord
   const subcategory = updates.subcategory !== undefined ? updates.subcategory : current.subcategory;
   const title = updates.title !== undefined ? updates.title : current.title;
   const notes = updates.notes !== undefined ? updates.notes : current.notes;
+  const recordType = updates.recordType !== undefined ? updates.recordType : (current.record_type || 'document');
 
   let currentAttachments = [];
   if (current.attachments_json) {
@@ -883,6 +920,7 @@ export function updatePersonalRecord(id: string, updates: Partial<PersonalRecord
   const cardHolder = updates.cardHolder !== undefined ? updates.cardHolder : current.card_holder;
   const cardExp = updates.cardExp !== undefined ? updates.cardExp : current.card_exp;
   const cardCvc = updates.cardCvc !== undefined ? updates.cardCvc : current.card_cvc;
+  const cardAtmPin = updates.cardAtmPin !== undefined ? updates.cardAtmPin : (current.card_atm_pin || '');
   const cardBank = updates.cardBank !== undefined ? updates.cardBank : current.card_bank;
   const cardBrand = updates.cardBrand !== undefined ? updates.cardBrand : current.card_brand;
   const cardTheme = updates.cardTheme !== undefined ? updates.cardTheme : current.card_theme;
@@ -891,7 +929,7 @@ export function updatePersonalRecord(id: string, updates: Partial<PersonalRecord
 
   db.prepare(`
     UPDATE personal_records
-    SET member_id = ?, category = ?, subcategory = ?, title = ?, notes = ?, file_name = ?, file_type = ?, file_size = ?, file_url = ?, file_data_url = ?, attachments_json = ?, todos_json = ?, card_number = ?, card_holder = ?, card_exp = ?, card_cvc = ?, card_bank = ?, card_brand = ?, card_theme = ?, card_account_no = ?, updated_at = ?
+    SET member_id = ?, category = ?, subcategory = ?, title = ?, notes = ?, record_type = ?, file_name = ?, file_type = ?, file_size = ?, file_url = ?, file_data_url = ?, attachments_json = ?, todos_json = ?, card_number = ?, card_holder = ?, card_exp = ?, card_cvc = ?, card_atm_pin = ?, card_bank = ?, card_brand = ?, card_theme = ?, card_account_no = ?, updated_at = ?
     WHERE id = ?
   `).run(
     memberId,
@@ -899,6 +937,7 @@ export function updatePersonalRecord(id: string, updates: Partial<PersonalRecord
     subcategory,
     title,
     notes,
+    recordType,
     fileName,
     fileType,
     fileSize,
@@ -910,6 +949,7 @@ export function updatePersonalRecord(id: string, updates: Partial<PersonalRecord
     cardHolder,
     cardExp,
     cardCvc,
+    cardAtmPin,
     cardBank,
     cardBrand,
     cardTheme,
@@ -925,6 +965,7 @@ export function updatePersonalRecord(id: string, updates: Partial<PersonalRecord
     subcategory,
     title,
     notes,
+    recordType,
     attachments,
     fileName,
     fileType,
@@ -936,6 +977,7 @@ export function updatePersonalRecord(id: string, updates: Partial<PersonalRecord
     cardHolder,
     cardExp,
     cardCvc,
+    cardAtmPin,
     cardBank,
     cardBrand,
     cardTheme,
@@ -1248,4 +1290,58 @@ export function markNotificationsAsRead(recipientId?: string, notificationId?: s
   } else if (recipientId) {
     db.prepare('UPDATE notifications SET read = 1 WHERE recipient_id = ? OR recipient_id = "all"').run(recipientId);
   }
+}
+
+// Passwords
+export function insertPassword(item: PasswordItem) {
+  db.prepare(`
+    INSERT INTO passwords (id, website, email, password, notes, category, member_id, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    item.id,
+    item.website,
+    item.email,
+    item.password,
+    item.notes || '',
+    item.category || 'General',
+    item.memberId || 'all',
+    item.createdAt,
+    item.updatedAt || null
+  );
+}
+
+export function updatePassword(id: string, updates: Partial<PasswordItem>) {
+  const current = db.prepare('SELECT * FROM passwords WHERE id = ?').get(id) as any;
+  if (!current) return null;
+
+  const website = updates.website !== undefined ? updates.website : current.website;
+  const email = updates.email !== undefined ? updates.email : current.email;
+  const password = updates.password !== undefined ? updates.password : current.password;
+  const notes = updates.notes !== undefined ? updates.notes : current.notes;
+  const category = updates.category !== undefined ? updates.category : current.category;
+  const memberId = updates.memberId !== undefined ? updates.memberId : current.member_id;
+  const updatedAt = new Date().toISOString();
+
+  db.prepare(`
+    UPDATE passwords
+    SET website = ?, email = ?, password = ?, notes = ?, category = ?, member_id = ?, updated_at = ?
+    WHERE id = ?
+  `).run(website, email, password, notes, category, memberId, updatedAt, id);
+
+  return {
+    id,
+    website,
+    email,
+    password,
+    notes,
+    category,
+    memberId,
+    createdAt: current.created_at,
+    updatedAt,
+  };
+}
+
+export function deletePassword(id: string): boolean {
+  const res = db.prepare('DELETE FROM passwords WHERE id = ?').run(id);
+  return res.changes > 0;
 }

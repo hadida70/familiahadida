@@ -9,9 +9,10 @@ import {
   Layers,
   Lock,
   CheckSquare,
+  Key,
 } from 'lucide-react';
 import { useWebSocket } from './lib/useWebSocket';
-import { GroceryItem, CustomList, PersonalRecord, CalendarTask, Contact, Member, TodoItem } from './types';
+import { GroceryItem, CustomList, PersonalRecord, CalendarTask, Contact, Member, TodoItem, PasswordItem } from './types';
 import { Header } from './components/Header';
 import { ListAccordion } from './components/ListAccordion';
 import { NotificationBanner } from './components/NotificationBanner';
@@ -34,6 +35,9 @@ import { AddContactModal } from './components/AddContactModal';
 import { PinLockScreen } from './components/PinLockScreen';
 import { AdminPinPromptModal } from './components/AdminPinPromptModal';
 import { MinimalistTodoList } from './components/MinimalistTodoList';
+import { PasswordsView } from './components/PasswordsView';
+import { AddPasswordModal } from './components/AddPasswordModal';
+import { PasswordPinPromptModal } from './components/PasswordPinPromptModal';
 
 export default function App() {
   const {
@@ -73,6 +77,9 @@ export default function App() {
     updateTodo,
     deleteTodo,
     clearCompletedTodos,
+    addPassword,
+    updatePassword,
+    deletePassword,
     sendPushAlert,
     markNotificationsRead,
     resetDemoData,
@@ -94,8 +101,8 @@ export default function App() {
   const [isAdminPinPromptOpen, setIsAdminPinPromptOpen] = useState(false);
   const isAdmin = authRole === 'admin';
 
-  // Navigation tab: 'calendar' (Home screen default), 'lists', 'personal_data', 'categories', 'contacts', 'todos'
-  const [activeTab, setActiveTab] = useState<'calendar' | 'lists' | 'personal_data' | 'categories' | 'contacts' | 'todos'>('calendar');
+  // Navigation tab: 'calendar' (Home screen default), 'lists', 'personal_data', 'categories', 'contacts', 'todos', 'passwords'
+  const [activeTab, setActiveTab] = useState<'calendar' | 'lists' | 'personal_data' | 'categories' | 'contacts' | 'todos' | 'passwords'>('calendar');
 
   // Modals state for Lists and Members
   const [isAddItemOpen, setIsAddItemOpen] = useState(false);
@@ -124,6 +131,12 @@ export default function App() {
   // Contacts Directory Modals
   const [isAddContactOpen, setIsAddContactOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
+
+  // Passwords Manager Modals & Security Pin
+  const [isAddPasswordOpen, setIsAddPasswordOpen] = useState(false);
+  const [editingPassword, setEditingPassword] = useState<PasswordItem | null>(null);
+  const [isPasswordUnlocked, setIsPasswordUnlocked] = useState(false);
+  const [isPasswordPinPromptOpen, setIsPasswordPinPromptOpen] = useState(false);
 
   // Active custom list id (for accordion expand / operations)
   const [activeListId, setActiveListId] = useState<string>('list_supermercado');
@@ -185,6 +198,26 @@ export default function App() {
     } else if (activeMember) {
       setActiveMember({ ...activeMember, role: 'admin' });
     }
+  };
+
+  // Tab switching with PIN requirement for Passwords section
+  const handleSelectTab = (tab: 'calendar' | 'lists' | 'personal_data' | 'categories' | 'contacts' | 'todos' | 'passwords') => {
+    if (tab === 'passwords') {
+      if (isPasswordUnlocked && activeTab === 'passwords') {
+        return;
+      }
+      setIsPasswordPinPromptOpen(true);
+    } else {
+      // Switching away from passwords locks the password section again
+      setIsPasswordUnlocked(false);
+      setActiveTab(tab);
+    }
+  };
+
+  const handlePasswordPinSuccess = () => {
+    setIsPasswordUnlocked(true);
+    setActiveTab('passwords');
+    setIsPasswordPinPromptOpen(false);
   };
 
   const handleOpenEditList = (list: CustomList) => {
@@ -290,6 +323,26 @@ export default function App() {
     }
   };
 
+  // Passwords Handlers
+  const handleOpenAddPassword = () => {
+    setEditingPassword(null);
+    setIsAddPasswordOpen(true);
+  };
+
+  const handleEditPassword = (password: PasswordItem) => {
+    setEditingPassword(password);
+    setIsAddPasswordOpen(true);
+  };
+
+  const handleSavePassword = (passwordData: Partial<PasswordItem>) => {
+    if (editingPassword) {
+      updatePassword(editingPassword.id, passwordData);
+      setEditingPassword(null);
+    } else {
+      addPassword(passwordData);
+    }
+  };
+
   // If app is not authenticated, show PIN lock screen
   if (!isAuthenticated) {
     return (
@@ -308,6 +361,7 @@ export default function App() {
   const totalContacts = data.contacts ? data.contacts.length : 0;
   const totalTodos = data.todos ? data.todos.length : 0;
   const pendingTodos = data.todos ? data.todos.filter((t) => !t.completed).length : 0;
+  const totalPasswords = data.passwords ? data.passwords.length : 0;
   const totalItems = data.items ? data.items.filter((i) => !i.completed).length : 0;
 
   return (
@@ -331,7 +385,7 @@ export default function App() {
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* Tab: CALENDARIO (Pantalla de inicio) */}
             <button
-              onClick={() => setActiveTab('calendar')}
+              onClick={() => handleSelectTab('calendar')}
               className={`px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 transition-all cursor-pointer border shrink-0 ${
                 activeTab === 'calendar'
                   ? 'bg-white dark:bg-slate-900 text-red-600 border-red-600 shadow-2xs ring-1 ring-red-500/20'
@@ -355,7 +409,7 @@ export default function App() {
 
             {/* Tab: LISTAS */}
             <button
-              onClick={() => setActiveTab('lists')}
+              onClick={() => handleSelectTab('lists')}
               className={`px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 transition-all cursor-pointer border shrink-0 ${
                 activeTab === 'lists'
                   ? 'bg-white dark:bg-slate-900 text-red-600 border-red-600 shadow-2xs ring-1 ring-red-500/20'
@@ -379,7 +433,7 @@ export default function App() {
 
             {/* Tab: DATOS PERSONALES */}
             <button
-              onClick={() => setActiveTab('personal_data')}
+              onClick={() => handleSelectTab('personal_data')}
               className={`px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 transition-all cursor-pointer border shrink-0 ${
                 activeTab === 'personal_data'
                   ? 'bg-white dark:bg-slate-900 text-red-600 border-red-600 shadow-2xs ring-1 ring-red-500/20'
@@ -403,7 +457,7 @@ export default function App() {
 
             {/* Tab: CONTACTOS */}
             <button
-              onClick={() => setActiveTab('contacts')}
+              onClick={() => handleSelectTab('contacts')}
               className={`px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 transition-all cursor-pointer border shrink-0 ${
                 activeTab === 'contacts'
                   ? 'bg-white dark:bg-slate-900 text-red-600 border-red-600 shadow-2xs ring-1 ring-red-500/20'
@@ -427,7 +481,7 @@ export default function App() {
 
             {/* Tab: TO-DO (Minimalista) */}
             <button
-              onClick={() => setActiveTab('todos')}
+              onClick={() => handleSelectTab('todos')}
               className={`px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 transition-all cursor-pointer border shrink-0 ${
                 activeTab === 'todos'
                   ? 'bg-white dark:bg-slate-900 text-red-600 border-red-600 shadow-2xs ring-1 ring-red-500/20'
@@ -445,6 +499,30 @@ export default function App() {
                   }`}
                 >
                   {pendingTodos}
+                </span>
+              )}
+            </button>
+
+            {/* Tab: CONTRASEÑA (Al lado de TO-DO) */}
+            <button
+              onClick={() => handleSelectTab('passwords')}
+              className={`px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 transition-all cursor-pointer border shrink-0 ${
+                activeTab === 'passwords'
+                  ? 'bg-white dark:bg-slate-900 text-red-600 border-red-600 shadow-2xs ring-1 ring-red-500/20'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-transparent hover:bg-slate-200 dark:hover:bg-slate-700'
+              }`}
+            >
+              <Key className="w-4 h-4" />
+              <span>CONTRASEÑA</span>
+              {totalPasswords > 0 && (
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                    activeTab === 'passwords'
+                      ? 'bg-red-50 text-red-600 border border-red-200'
+                      : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                  }`}
+                >
+                  {totalPasswords}
                 </span>
               )}
             </button>
@@ -568,6 +646,46 @@ export default function App() {
             onDeleteTodo={deleteTodo}
             onClearCompleted={clearCompletedTodos}
           />
+        ) : activeTab === 'passwords' ? (
+          /* GESTOR DE CONTRASEÑAS TIPO TABLA (PROTEGIDO POR PIN) */
+          isPasswordUnlocked ? (
+            <PasswordsView
+              passwords={data.passwords || []}
+              members={data.members}
+              activeMember={activeMember}
+              isAdmin={isAdmin}
+              onOpenAddPassword={handleOpenAddPassword}
+              onEditPassword={handleEditPassword}
+              onDeletePassword={deletePassword}
+              onLock={() => {
+                setIsPasswordUnlocked(false);
+                setActiveTab('calendar');
+              }}
+              fontSize={fontSize}
+            />
+          ) : (
+            <div className="max-w-md mx-auto my-12 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-8 text-center space-y-4 shadow-xl">
+              <div className="w-16 h-16 rounded-3xl bg-red-50 dark:bg-red-950/40 text-red-600 flex items-center justify-center mx-auto border border-red-200 dark:border-red-900/60 shadow-xs">
+                <Lock className="w-8 h-8 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-900 dark:text-white">
+                  Sección Bloqueada
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Introduce tu PIN de seguridad (1474) para desbloquear y ver las contraseñas guardadas.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPasswordPinPromptOpen(true)}
+                className="w-full py-3 px-4 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm shadow-md shadow-red-600/20 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                <Key className="w-4 h-4" />
+                <span>Desbloquear con PIN</span>
+              </button>
+            </div>
+          )
         ) : (
           /* DIRECTORIO DE CONTACTOS TELEFÓNICOS */
           <ContactsDirectoryView
@@ -728,11 +846,33 @@ export default function App() {
         editingContact={editingContact}
       />
 
+      {/* Passwords Add / Edit Modal */}
+      <AddPasswordModal
+        isOpen={isAddPasswordOpen}
+        onClose={() => {
+          setIsAddPasswordOpen(false);
+          setEditingPassword(null);
+        }}
+        onSave={handleSavePassword}
+        editingPassword={editingPassword}
+        members={data.members}
+        activeMember={activeMember}
+      />
+
       {/* Admin PIN Prompt Modal */}
       <AdminPinPromptModal
         isOpen={isAdminPinPromptOpen}
         onClose={() => setIsAdminPinPromptOpen(false)}
         onSuccess={handleAdminPinSuccess}
+      />
+
+      {/* Password Section PIN Prompt Modal */}
+      <PasswordPinPromptModal
+        isOpen={isPasswordPinPromptOpen}
+        onClose={() => setIsPasswordPinPromptOpen(false)}
+        onSuccess={handlePasswordPinSuccess}
+        activeMember={activeMember}
+        onLogin={login}
       />
     </div>
   );

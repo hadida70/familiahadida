@@ -11,6 +11,7 @@ import {
   CalendarTask,
   Contact,
   TodoItem,
+  PasswordItem,
 } from '../types';
 import { sounds } from './sound';
 
@@ -51,6 +52,9 @@ interface UseWebSocketReturn {
   updateTodo: (id: string, updates: Partial<TodoItem>) => Promise<void>;
   deleteTodo: (id: string) => Promise<void>;
   clearCompletedTodos: () => Promise<void>;
+  addPassword: (item: Partial<PasswordItem>) => Promise<void>;
+  updatePassword: (id: string, updates: Partial<PasswordItem>) => Promise<void>;
+  deletePassword: (id: string) => Promise<void>;
   sendPushAlert: (recipientId: string, title: string, message: string) => Promise<void>;
   markNotificationsRead: (memberId?: string, notificationId?: string) => Promise<void>;
   resetDemoData: () => Promise<void>;
@@ -69,6 +73,7 @@ export function useWebSocket(): UseWebSocketReturn {
     calendarTasks: [],
     contacts: [],
     todos: [],
+    passwords: [],
     notifications: [],
   });
   const [connected, setConnected] = useState(false);
@@ -140,6 +145,7 @@ export function useWebSocket(): UseWebSocketReturn {
         if (!json.calendarTasks) json.calendarTasks = [];
         if (!json.contacts) json.contacts = [];
         if (!json.todos) json.todos = [];
+        if (!json.passwords) json.passwords = [];
         setData(json);
 
         // Restore active member if saved or pick default
@@ -450,6 +456,33 @@ export function useWebSocket(): UseWebSocketReturn {
               setData((prev) => ({
                 ...prev,
                 todos: (prev.todos || []).filter((t) => t.id !== msg.payload.todoId),
+              }));
+              break;
+
+            case 'PASSWORD_ADDED':
+              setData((prev) => ({
+                ...prev,
+                passwords: [
+                  msg.payload.password,
+                  ...(prev.passwords || []).filter((p) => p.id !== msg.payload.password.id),
+                ],
+              }));
+              sounds.playAddSound();
+              break;
+
+            case 'PASSWORD_UPDATED':
+              setData((prev) => ({
+                ...prev,
+                passwords: (prev.passwords || []).map((p) =>
+                  p.id === msg.payload.password.id ? msg.payload.password : p
+                ),
+              }));
+              break;
+
+            case 'PASSWORD_DELETED':
+              setData((prev) => ({
+                ...prev,
+                passwords: (prev.passwords || []).filter((p) => p.id !== msg.payload.passwordId),
               }));
               break;
 
@@ -1029,6 +1062,41 @@ export function useWebSocket(): UseWebSocketReturn {
     }
   };
 
+  const addPassword = async (item: Partial<PasswordItem>) => {
+    try {
+      await fetch('/api/passwords', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(item),
+      });
+    } catch (err) {
+      console.error('Error adding password:', err);
+    }
+  };
+
+  const updatePassword = async (id: string, updates: Partial<PasswordItem>) => {
+    try {
+      await fetch(`/api/passwords/${id}`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(updates),
+      });
+    } catch (err) {
+      console.error('Error updating password:', err);
+    }
+  };
+
+  const deletePassword = async (id: string) => {
+    try {
+      await fetch(`/api/passwords/${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+    } catch (err) {
+      console.error('Error deleting password:', err);
+    }
+  };
+
   const sendPushAlert = async (recipientId: string, title: string, message: string) => {
     try {
       await fetch('/api/notifications/send', {
@@ -1105,6 +1173,9 @@ export function useWebSocket(): UseWebSocketReturn {
     updateTodo,
     deleteTodo,
     clearCompletedTodos,
+    addPassword,
+    updatePassword,
+    deletePassword,
     sendPushAlert,
     markNotificationsRead,
     resetDemoData,

@@ -69,6 +69,9 @@ export interface PersonalRecord {
   title?: string;
   notes?: string;
 
+  // Record mode: document attachments or structured items list
+  recordType?: 'document' | 'list' | 'both';
+
   // Multiple attachments support
   attachments?: RecordAttachment[];
 
@@ -82,11 +85,12 @@ export interface PersonalRecord {
   // Embedded Checklist / To-Do items for this subcategory
   todos?: RecordTodo[];
 
-  // Credit / Debit Card specific fields
+  // Credit / Debit Card specific fields (available for Banco category)
   cardNumber?: string;       // e.g. "4580 9811 3659 9900"
   cardHolder?: string;       // e.g. "JAIME HADIDA"
   cardExp?: string;          // e.g. "12/30"
   cardCvc?: string;          // e.g. "261"
+  cardAtmPin?: string;       // e.g. "1474" (Código de Cajero Automático / PIN ATM)
   cardBank?: string;         // e.g. "DREAMCARD VIP (MAX)", "ISRACARD"
   cardBrand?: 'visa' | 'mastercard' | 'amex' | 'isracard' | 'other';
   cardTheme?: 'black_vip' | 'isracard_white' | 'blue_metal' | 'gold_luxury' | 'titanium';
@@ -135,6 +139,18 @@ export interface TodoItem {
   updatedAt?: string;
 }
 
+export interface PasswordItem {
+  id: string;
+  website: string; // Página Web / App / Servicio (e.g. "Google", "Banco Santander", "Netflix")
+  email: string;   // Correo / Usuario
+  password: string; // Contraseña
+  notes?: string;   // Nota / Detalles adicionales
+  category?: string; // e.g. 'General', 'Bancos', 'Streaming', 'Servicios', 'Trabajo', 'Personal'
+  memberId?: string; // Integrante propietario opcional o 'all'
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export interface PushNotification {
   id: string;
   recipientId: string;
@@ -152,7 +168,9 @@ export interface PushNotification {
     | 'task_created'
     | 'task_completed'
     | 'todo_added'
-    | 'todo_completed';
+    | 'todo_completed'
+    | 'password_added'
+    | 'password_updated';
   itemId?: string;
   listId?: string;
   taskId?: string;
@@ -178,6 +196,7 @@ export interface AppData {
   calendarTasks?: CalendarTask[];
   contacts?: Contact[];
   todos?: TodoItem[];
+  passwords?: PasswordItem[];
   notifications: PushNotification[];
 }
 
