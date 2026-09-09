@@ -5,11 +5,8 @@ import {
   Download,
   Eye,
   FileText,
-  Folder,
-  Tag,
   Send,
   Paperclip,
-  CreditCard as CreditCardIcon,
   Image as ImageIcon,
   CheckCircle2,
   Square,
@@ -137,33 +134,41 @@ export const PersonalRecordCard: React.FC<PersonalRecordCardProps> = ({
       className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 sm:p-5 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between group"
     >
       <div>
-        {/* Header: Categoría + Member Badge + Actions */}
+        {/* Header: Title / Subcategory + Member Badge + Actions */}
         <div className="flex items-start justify-between gap-2 mb-3">
-          <div className="flex flex-wrap items-center gap-1.5 min-w-0">
-            {/* Categoría Badge */}
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800/60">
-              {isCard ? <CreditCardIcon className="w-3 h-3 text-red-500" /> : isListRecord ? <ListTodo className="w-3 h-3 text-red-500" /> : <Folder className="w-3 h-3" />}
-              <span>{record.category || 'General'}</span>
-            </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 flex-wrap mb-1">
+              {/* Member Owner Badge */}
+              {member && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                  👤 {member.name}
+                </span>
+              )}
 
-            {/* Mode Badge if list */}
-            {isListRecord && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-extrabold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/50">
-                <ListTodo className="w-3 h-3 text-amber-500" />
-                <span>Listado</span>
-              </span>
-            )}
+              {/* Mode Badge if list */}
+              {isListRecord && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-extrabold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/50">
+                  <ListTodo className="w-3 h-3 text-amber-500" />
+                  <span>Listado</span>
+                </span>
+              )}
 
-            {/* Member Owner Badge */}
-            {member && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                {member.name}
-              </span>
-            )}
+              {/* Attachments count pill */}
+              {attachments.length > 0 && (
+                <span className="text-[10px] font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/50 px-2 py-0.5 rounded-md border border-red-200 dark:border-red-900/60">
+                  📎 {attachments.length} {attachments.length === 1 ? 'archivo' : 'archivos'}
+                </span>
+              )}
+            </div>
+
+            {/* Name / Title of the Record */}
+            <h4 className="text-base font-black text-slate-900 dark:text-white leading-tight">
+              {record.subcategory || record.title || 'Dato Personal'}
+            </h4>
           </div>
 
           {/* Card Actions */}
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-1 shrink-0 pt-0.5">
             {/* Send / Share button */}
             {onSendRecord && (
               <button
@@ -195,24 +200,6 @@ export const PersonalRecordCard: React.FC<PersonalRecordCardProps> = ({
               </>
             )}
           </div>
-        </div>
-
-        {/* Subcategoría as Main Title */}
-        <div className="mb-3">
-          <div className="flex items-center justify-between gap-1 text-xs text-slate-400 dark:text-slate-500 mb-0.5">
-            <div className="flex items-center gap-1.5">
-              <Tag className="w-3 h-3 text-red-500" />
-              <span>Subcategoría:</span>
-            </div>
-            {attachments.length > 0 && (
-              <span className="text-[10px] font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/50 px-2 py-0.5 rounded-md border border-red-200 dark:border-red-900/60">
-                📎 {attachments.length} {attachments.length === 1 ? 'archivo' : 'archivos'}
-              </span>
-            )}
-          </div>
-          <h4 className="text-base font-black text-slate-900 dark:text-white leading-tight">
-            {record.subcategory || record.title || 'Dato Personal'}
-          </h4>
         </div>
 
         {/* ================= CREDIT CARD VISUALIZER (ONLY FOR BANK CATEGORY) ================= */}
