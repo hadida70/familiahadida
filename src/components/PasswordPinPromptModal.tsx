@@ -79,7 +79,7 @@ export const PasswordPinPromptModal: React.FC<PasswordPinPromptModalProps> = ({
       onClose();
     } else {
       setError(true);
-      setErrorMessage('PIN incorrecto. Intenta con 1474.');
+      setErrorMessage('PIN incorrecto. Inténtalo de nuevo.');
       setTimeout(() => {
         setPin('');
       }, 500);

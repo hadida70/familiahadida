@@ -96,7 +96,7 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
           onUnlock(result.user, isAdmin);
         } else {
           setError(true);
-          setErrorMessage(result.error || 'PIN incorrecto.');
+          setErrorMessage(result.error || 'PIN incorrecto. Inténtalo de nuevo.');
           setTimeout(() => {
             setPin('');
           }, 600);
@@ -115,7 +115,7 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
           onUnlock(authenticatedMember, isAdmin);
         } else {
           setError(true);
-          setErrorMessage('PIN incorrecto. Ingresa 1474.');
+          setErrorMessage('PIN incorrecto. Inténtalo de nuevo.');
           setTimeout(() => {
             setPin('');
           }, 600);
