@@ -1,4 +1,5 @@
 import express, { Request, Response, NextFunction } from 'express';
+import compression from 'compression';
 import path from 'path';
 import fs from 'fs';
 import http from 'http';
@@ -180,6 +181,7 @@ function optionalAuth(req: AuthRequest, _res: Response, next: NextFunction) {
 
 async function startServer() {
   const app = express();
+  app.use(compression());
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
   app.use(express.static(path.join(process.cwd(), 'public')));
@@ -189,6 +191,21 @@ async function startServer() {
 
   // WebSocket Server setup
   const wss = new WebSocketServer({ noServer: true });
+
+  // 25s heartbeat keep-alive to keep mobile connections open
+  const heartbeatInterval = setInterval(() => {
+    wss.clients.forEach((client: any) => {
+      if (client.isAlive === false) {
+        return client.terminate();
+      }
+      client.isAlive = false;
+      client.ping();
+    });
+  }, 25000);
+
+  wss.on('close', () => {
+    clearInterval(heartbeatInterval);
+  });
 
   server.on('upgrade', (request, socket, head) => {
     const { pathname } = new URL(request.url || '', `http://${request.headers.host}`);
@@ -210,14 +227,30 @@ async function startServer() {
     });
   }
 
-  wss.on('connection', (ws) => {
-    // Send full initial state to newly connected client
+  wss.on('connection', (ws: any) => {
+    ws.isAlive = true;
+
+    ws.on('pong', () => {
+      ws.isAlive = true;
+    });
+
+    // Send full initial state to newly connected client immediately
     const currentData = getAllAppData();
     ws.send(JSON.stringify({ type: 'INIT_SYNC', payload: currentData }));
 
     ws.on('message', (raw) => {
       try {
         const msg = JSON.parse(raw.toString());
+        if (msg.type === 'PING') {
+          ws.isAlive = true;
+          ws.send(JSON.stringify({ type: 'PONG' }));
+          return;
+        }
+        if (msg.type === 'REQUEST_SYNC') {
+          const freshData = getAllAppData();
+          ws.send(JSON.stringify({ type: 'INIT_SYNC', payload: freshData }));
+          return;
+        }
         console.log('WS received message:', msg.type);
       } catch (err) {
         console.error('WS parse error:', err);
@@ -460,6 +493,9 @@ async function startServer() {
 
   // GET /api/data - Get complete state
   app.get('/api/data', (_req, res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     const fullData = getAllAppData();
     res.json(fullData);
   });

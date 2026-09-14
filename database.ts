@@ -18,12 +18,16 @@ import {
 
 const DB_PATH = process.env.DATABASE_URL || path.join(process.cwd(), 'database.sqlite');
 const LEGACY_JSON_FILE = process.env.DB_FILE || path.join(process.cwd(), 'groceries_db.json');
+const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(process.cwd(), 'uploads');
 const DEFAULT_PIN = '1474';
 
-// Ensure directory exists
+// Ensure directories exist
 const dbDir = path.dirname(DB_PATH);
 if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
+}
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 }
 
 export const db = new Database(DB_PATH);
@@ -31,6 +35,30 @@ export const db = new Database(DB_PATH);
 // Optimize SQLite for high concurrency and performance
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
+
+export function saveBase64ToDisk(dataUrl: string, recordId: string, index: number = 0): string | null {
+  if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) return null;
+  try {
+    const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+    if (!matches) return null;
+    const mime = matches[1];
+    const base64Data = matches[2];
+    let ext = '.jpg';
+    if (mime.includes('png')) ext = '.png';
+    else if (mime.includes('pdf')) ext = '.pdf';
+    else if (mime.includes('webp')) ext = '.webp';
+    else if (mime.includes('gif')) ext = '.gif';
+
+    const safeId = recordId.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const fileName = `migrated_${safeId}_${Date.now()}_${index}${ext}`;
+    const filePath = path.join(UPLOADS_DIR, fileName);
+    fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
+    return `/uploads/${fileName}`;
+  } catch (err) {
+    console.error('Error saving base64 to disk:', err);
+    return null;
+  }
+}
 
 export function initDatabase() {
   // 1. Users / Members table
@@ -236,6 +264,65 @@ export function initDatabase() {
   const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };
   if (userCount.count === 0) {
     seedOrMigrateFromLegacy();
+  }
+
+  // Auto-migration: Extract and migrate any base64 images in personal_records to physical files in /uploads/
+  try {
+    const allRecords = db.prepare('SELECT id, file_url, file_data_url, attachments_json FROM personal_records').all() as any[];
+    for (const r of allRecords) {
+      let changed = false;
+      let fileUrl = r.file_url || '';
+      let attachments: any[] = [];
+      if (r.attachments_json) {
+        try {
+          attachments = JSON.parse(r.attachments_json);
+        } catch {
+          attachments = [];
+        }
+      }
+
+      // Check main file_data_url
+      if (r.file_data_url && r.file_data_url.startsWith('data:')) {
+        const savedUrl = saveBase64ToDisk(r.file_data_url, r.id, 0);
+        if (savedUrl) {
+          fileUrl = savedUrl;
+          changed = true;
+        }
+      }
+
+      // Check attachments
+      if (Array.isArray(attachments)) {
+        attachments = attachments.map((att, idx) => {
+          if (att.fileDataUrl && att.fileDataUrl.startsWith('data:')) {
+            const savedAttUrl = saveBase64ToDisk(att.fileDataUrl, `${r.id}_att`, idx);
+            changed = true;
+            return {
+              ...att,
+              fileUrl: savedAttUrl || att.fileUrl || '',
+              fileDataUrl: '', // remove base64
+            };
+          }
+          if (att.fileDataUrl && att.fileUrl) {
+            changed = true;
+            return {
+              ...att,
+              fileDataUrl: '',
+            };
+          }
+          return att;
+        });
+      }
+
+      if (changed) {
+        db.prepare(`
+          UPDATE personal_records
+          SET file_url = ?, file_data_url = '', attachments_json = ?
+          WHERE id = ?
+        `).run(fileUrl, JSON.stringify(attachments), r.id);
+      }
+    }
+  } catch (err) {
+    console.error('Error in base64 migration:', err);
   }
 
   // Auto-migration: Ensure Cédula / DNI is migrated to Cédula in existing databases if present
@@ -590,18 +677,23 @@ export function getAllAppData(): AppData {
         }
       }
       if (!Array.isArray(attachments) || attachments.length === 0) {
-        if (r.fileDataUrl || r.fileUrl) {
+        if (r.fileUrl) {
           attachments = [{
             id: 'att_' + r.id,
             fileName: r.fileName || 'Documento adjunto',
             fileType: r.fileType || '',
             fileSize: r.fileSize || 0,
             fileUrl: r.fileUrl || '',
-            fileDataUrl: r.fileDataUrl || '',
+            fileDataUrl: '',
           }];
         } else {
           attachments = [];
         }
+      } else {
+        attachments = attachments.map((att: any) => ({
+          ...att,
+          fileDataUrl: '',
+        }));
       }
 
       let todos = [];
@@ -629,7 +721,7 @@ export function getAllAppData(): AppData {
         fileType: r.fileType || (attachments[0]?.fileType || ''),
         fileSize: r.fileSize || (attachments[0]?.fileSize || 0),
         fileUrl: r.fileUrl || (attachments[0]?.fileUrl || ''),
-        fileDataUrl: r.fileDataUrl || (attachments[0]?.fileDataUrl || ''),
+        fileDataUrl: '',
         todos,
         cardNumber: r.cardNumber,
         cardHolder: r.cardHolder,
@@ -817,7 +909,7 @@ export function deleteCustomList(id: string): boolean {
 
 // Personal Records / Documents
 export function insertPersonalRecord(record: PersonalRecord) {
-  const attachments = record.attachments && record.attachments.length > 0
+  let attachments = record.attachments && record.attachments.length > 0
     ? record.attachments
     : (record.fileDataUrl || record.fileUrl
         ? [{
@@ -830,12 +922,30 @@ export function insertPersonalRecord(record: PersonalRecord) {
           }]
         : []);
 
+  // Migrate any base64 in attachments to disk file
+  attachments = attachments.map((att: any, idx: number) => {
+    let fileUrl = att.fileUrl || '';
+    if (att.fileDataUrl && att.fileDataUrl.startsWith('data:')) {
+      const savedUrl = saveBase64ToDisk(att.fileDataUrl, record.id, idx);
+      if (savedUrl) fileUrl = savedUrl;
+    }
+    return {
+      ...att,
+      fileUrl,
+      fileDataUrl: '', // do not save massive base64 to DB
+    };
+  });
+
   const firstAtt = attachments[0];
   const fileName = firstAtt ? firstAtt.fileName : (record.fileName || '');
   const fileType = firstAtt ? firstAtt.fileType || '' : (record.fileType || '');
   const fileSize = firstAtt ? firstAtt.fileSize || 0 : (record.fileSize || 0);
-  const fileUrl = firstAtt ? firstAtt.fileUrl || '' : (record.fileUrl || '');
-  const fileDataUrl = firstAtt ? firstAtt.fileDataUrl || '' : (record.fileDataUrl || '');
+  let fileUrl = firstAtt ? firstAtt.fileUrl || '' : (record.fileUrl || '');
+  if (!fileUrl && record.fileDataUrl && record.fileDataUrl.startsWith('data:')) {
+    const savedUrl = saveBase64ToDisk(record.fileDataUrl, record.id, 0);
+    if (savedUrl) fileUrl = savedUrl;
+  }
+
   const attachmentsJson = JSON.stringify(attachments);
   const todosJson = JSON.stringify(record.todos || []);
 
@@ -856,7 +966,7 @@ export function insertPersonalRecord(record: PersonalRecord) {
     fileType,
     fileSize,
     fileUrl,
-    fileDataUrl,
+    '', // file_data_url is kept empty
     attachmentsJson,
     todosJson,
     record.cardNumber || '',
@@ -893,23 +1003,42 @@ export function updatePersonalRecord(id: string, updates: Partial<PersonalRecord
     }
   }
 
-  const attachments = updates.attachments !== undefined
+  let attachments = updates.attachments !== undefined
     ? updates.attachments
-    : (currentAttachments.length > 0 ? currentAttachments : (current.file_data_url || current.file_url ? [{
+    : (currentAttachments.length > 0 ? currentAttachments : (current.file_url ? [{
         id: 'att_' + current.id,
         fileName: current.file_name || '',
         fileType: current.file_type || '',
         fileSize: current.file_size || 0,
         fileUrl: current.file_url || '',
-        fileDataUrl: current.file_data_url || '',
+        fileDataUrl: '',
       }] : []));
+
+  // Migrate any base64 in attachments to disk
+  attachments = attachments.map((att: any, idx: number) => {
+    let fileUrl = att.fileUrl || '';
+    if (att.fileDataUrl && att.fileDataUrl.startsWith('data:')) {
+      const savedUrl = saveBase64ToDisk(att.fileDataUrl, id, idx);
+      if (savedUrl) fileUrl = savedUrl;
+    }
+    return {
+      ...att,
+      fileUrl,
+      fileDataUrl: '',
+    };
+  });
 
   const firstAtt = attachments[0];
   const fileName = firstAtt ? firstAtt.fileName : (updates.fileName !== undefined ? updates.fileName : current.file_name);
   const fileType = firstAtt ? firstAtt.fileType || '' : (updates.fileType !== undefined ? updates.fileType : current.file_type);
   const fileSize = firstAtt ? firstAtt.fileSize || 0 : (updates.fileSize !== undefined ? updates.fileSize : current.file_size);
-  const fileUrl = firstAtt ? firstAtt.fileUrl || '' : (updates.fileUrl !== undefined ? updates.fileUrl : current.file_url);
-  const fileDataUrl = firstAtt ? firstAtt.fileDataUrl || '' : (updates.fileDataUrl !== undefined ? updates.fileDataUrl : current.file_data_url);
+  let fileUrl = firstAtt ? firstAtt.fileUrl || '' : (updates.fileUrl !== undefined ? updates.fileUrl : current.file_url);
+
+  if (!fileUrl && updates.fileDataUrl && updates.fileDataUrl.startsWith('data:')) {
+    const savedUrl = saveBase64ToDisk(updates.fileDataUrl, id, 0);
+    if (savedUrl) fileUrl = savedUrl;
+  }
+
   const attachmentsJson = JSON.stringify(attachments);
 
   let currentTodos = [];
@@ -936,7 +1065,7 @@ export function updatePersonalRecord(id: string, updates: Partial<PersonalRecord
 
   db.prepare(`
     UPDATE personal_records
-    SET member_id = ?, category = ?, subcategory = ?, title = ?, notes = ?, record_type = ?, file_name = ?, file_type = ?, file_size = ?, file_url = ?, file_data_url = ?, attachments_json = ?, todos_json = ?, card_number = ?, card_holder = ?, card_exp = ?, card_cvc = ?, card_atm_pin = ?, card_bank = ?, card_brand = ?, card_theme = ?, card_account_no = ?, updated_at = ?
+    SET member_id = ?, category = ?, subcategory = ?, title = ?, notes = ?, record_type = ?, file_name = ?, file_type = ?, file_size = ?, file_url = ?, file_data_url = '', attachments_json = ?, todos_json = ?, card_number = ?, card_holder = ?, card_exp = ?, card_cvc = ?, card_atm_pin = ?, card_bank = ?, card_brand = ?, card_theme = ?, card_account_no = ?, updated_at = ?
     WHERE id = ?
   `).run(
     memberId,
@@ -949,7 +1078,6 @@ export function updatePersonalRecord(id: string, updates: Partial<PersonalRecord
     fileType,
     fileSize,
     fileUrl,
-    fileDataUrl,
     attachmentsJson,
     todosJson,
     cardNumber,
@@ -978,7 +1106,7 @@ export function updatePersonalRecord(id: string, updates: Partial<PersonalRecord
     fileType,
     fileSize,
     fileUrl,
-    fileDataUrl,
+    fileDataUrl: '',
     todos,
     cardNumber,
     cardHolder,

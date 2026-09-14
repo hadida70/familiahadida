@@ -11,16 +11,26 @@ interface PinLockScreenProps {
   initialMember?: Member | null;
 }
 
+const DEFAULT_MEMBERS: Member[] = [
+  { id: 'member_jaime', name: 'JAIME', username: 'jaime', role: 'admin', avatarColor: 'bg-orange-500', avatarInitial: 'J', iconName: 'Crown' },
+  { id: 'member_gloria', name: 'GLORIA', username: 'gloria', role: 'member', avatarColor: 'bg-pink-600', avatarInitial: 'G', iconName: 'Heart' },
+  { id: 'member_diego', name: 'DIEGO', username: 'diego', role: 'member', avatarColor: 'bg-blue-600', avatarInitial: 'D', iconName: 'Star' },
+  { id: 'member_valeria', name: 'VALERIA', username: 'valeria', role: 'member', avatarColor: 'bg-purple-600', avatarInitial: 'V', iconName: 'Sparkles' },
+  { id: 'member_estefania', name: 'ESTEFANIA', username: 'estefania', role: 'member', avatarColor: 'bg-rose-600', avatarInitial: 'E', iconName: 'Sun' },
+];
+
 export const PinLockScreen: React.FC<PinLockScreenProps> = ({
   members,
   onUnlock,
   onLogin,
   initialMember,
 }) => {
+  const displayMembers = members && members.length > 0 ? members : DEFAULT_MEMBERS;
+
   // Find Jaime or member with admin role
   const jaimeAdminMember =
-    members.find((m) => m.name.toUpperCase() === 'JAIME' || m.role === 'admin') ||
-    members[0] || {
+    displayMembers.find((m) => m.name.toUpperCase() === 'JAIME' || m.role === 'admin') ||
+    displayMembers[0] || {
       id: 'member_jaime',
       name: 'JAIME',
       role: 'admin' as const,
@@ -41,7 +51,7 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
 
   // Selected member object
   const selectedMember =
-    members.find((m) => m.id === selectedMemberId) || jaimeAdminMember;
+    displayMembers.find((m) => m.id === selectedMemberId) || jaimeAdminMember;
   const isSelectedAdmin =
     selectedMember.name.toUpperCase() === 'JAIME' || selectedMember.role === 'admin';
 
@@ -164,7 +174,7 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
 
           {/* Members Grid / Pills */}
           <div className="grid grid-cols-2 gap-2 max-h-52 overflow-y-auto pr-1">
-            {members.map((member) => {
+            {displayMembers.map((member) => {
               const isAdmin =
                 member.name.toUpperCase() === 'JAIME' || member.role === 'admin';
               const isSelected = selectedMemberId === member.id;

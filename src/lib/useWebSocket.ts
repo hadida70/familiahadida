@@ -64,18 +64,48 @@ interface UseWebSocketReturn {
   pushPermission: NotificationPermission;
 }
 
+const DEFAULT_INITIAL_DATA: AppData = {
+  members: [
+    { id: 'member_jaime', name: 'JAIME', username: 'jaime', role: 'admin', avatarColor: 'bg-orange-500', avatarInitial: 'J', iconName: 'Crown' },
+    { id: 'member_gloria', name: 'GLORIA', username: 'gloria', role: 'member', avatarColor: 'bg-pink-600', avatarInitial: 'G', iconName: 'Heart' },
+    { id: 'member_diego', name: 'DIEGO', username: 'diego', role: 'member', avatarColor: 'bg-blue-600', avatarInitial: 'D', iconName: 'Star' },
+    { id: 'member_valeria', name: 'VALERIA', username: 'valeria', role: 'member', avatarColor: 'bg-purple-600', avatarInitial: 'V', iconName: 'Sparkles' },
+    { id: 'member_estefania', name: 'ESTEFANIA', username: 'estefania', role: 'member', avatarColor: 'bg-rose-600', avatarInitial: 'E', iconName: 'Sun' },
+  ],
+  lists: [
+    { id: 'list_supermercado', name: 'Supermercado', icon: 'ShoppingCart', color: 'emerald', description: 'Compras para la casa' },
+  ],
+  items: [],
+  personalRecords: [],
+  calendarTasks: [],
+  contacts: [],
+  todos: [],
+  passwords: [],
+  notifications: [],
+};
+
+function getInitialData(): AppData {
+  if (typeof window === 'undefined') return DEFAULT_INITIAL_DATA;
+  try {
+    const cached = localStorage.getItem('hadida_family_cached_app_data');
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (parsed && Array.isArray(parsed.members) && parsed.members.length > 0) {
+        return {
+          ...DEFAULT_INITIAL_DATA,
+          ...parsed,
+          members: parsed.members.length > 0 ? parsed.members : DEFAULT_INITIAL_DATA.members,
+        };
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to parse cached app data', e);
+  }
+  return DEFAULT_INITIAL_DATA;
+}
+
 export function useWebSocket(): UseWebSocketReturn {
-  const [data, setData] = useState<AppData>({
-    members: [],
-    lists: [],
-    items: [],
-    personalRecords: [],
-    calendarTasks: [],
-    contacts: [],
-    todos: [],
-    passwords: [],
-    notifications: [],
-  });
+  const [data, setData] = useState<AppData>(getInitialData);
   const [connected, setConnected] = useState(false);
   const [activeMember, setActiveMemberState] = useState<Member | null>(null);
   const [token, setToken] = useState<string | null>(() => {
@@ -93,6 +123,17 @@ export function useWebSocket(): UseWebSocketReturn {
   useEffect(() => {
     activeMemberRef.current = activeMember;
   }, [activeMember]);
+
+  // Persist updated data to local storage for instant render on mobile cold starts
+  useEffect(() => {
+    if (typeof window !== 'undefined' && data && Array.isArray(data.members) && data.members.length > 0) {
+      try {
+        localStorage.setItem('hadida_family_cached_app_data', JSON.stringify(data));
+      } catch (e) {
+        // Safe failover
+      }
+    }
+  }, [data]);
 
   const getAuthHeaders = useCallback((): HeadersInit => {
     const currentToken = token || localStorage.getItem('hadida_family_auth_token');
@@ -532,7 +573,47 @@ export function useWebSocket(): UseWebSocketReturn {
 
     connect();
 
+    // Client ping heartbeat every 20s to prevent mobile timeouts
+    const pingInterval = setInterval(() => {
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: 'PING' }));
+      }
+    }, 20000);
+
+    // Auto-refresh when mobile phone brings app back to foreground
+    const handleVisibilityChange = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        fetchFullData();
+        if (!socket || socket.readyState !== WebSocket.OPEN) {
+          connect();
+        } else {
+          socket.send(JSON.stringify({ type: 'REQUEST_SYNC' }));
+        }
+      }
+    };
+
+    const handleOnline = () => {
+      fetchFullData();
+      if (!socket || socket.readyState !== WebSocket.OPEN) {
+        connect();
+      }
+    };
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', handleOnline);
+    }
+
     return () => {
+      clearInterval(pingInterval);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('online', handleOnline);
+      }
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
       if (socket) socket.close();
     };
