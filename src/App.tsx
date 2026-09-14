@@ -37,7 +37,6 @@ import { PinLockScreen } from './components/PinLockScreen';
 import { AdminPinPromptModal } from './components/AdminPinPromptModal';
 import { MinimalistTodoList } from './components/MinimalistTodoList';
 import { PasswordsView } from './components/PasswordsView';
-import { AddPasswordModal } from './components/AddPasswordModal';
 import { PasswordPinPromptModal } from './components/PasswordPinPromptModal';
 
 export default function App() {
@@ -134,9 +133,7 @@ export default function App() {
   const [isAddContactOpen, setIsAddContactOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
 
-  // Passwords Manager Modals & Security Pin
-  const [isAddPasswordOpen, setIsAddPasswordOpen] = useState(false);
-  const [editingPassword, setEditingPassword] = useState<PasswordItem | null>(null);
+  // Passwords Security Pin & Unlock State
   const [isPasswordUnlocked, setIsPasswordUnlocked] = useState(false);
   const [isPasswordPinPromptOpen, setIsPasswordPinPromptOpen] = useState(false);
 
@@ -325,25 +322,6 @@ export default function App() {
     }
   };
 
-  // Passwords Handlers
-  const handleOpenAddPassword = () => {
-    setEditingPassword(null);
-    setIsAddPasswordOpen(true);
-  };
-
-  const handleEditPassword = (password: PasswordItem) => {
-    setEditingPassword(password);
-    setIsAddPasswordOpen(true);
-  };
-
-  const handleSavePassword = (passwordData: Partial<PasswordItem>) => {
-    if (editingPassword) {
-      updatePassword(editingPassword.id, passwordData);
-      setEditingPassword(null);
-    } else {
-      addPassword(passwordData);
-    }
-  };
 
   // If app is not authenticated, show PIN lock screen
   if (!isAuthenticated) {
@@ -656,8 +634,8 @@ export default function App() {
               members={data.members}
               activeMember={activeMember}
               isAdmin={isAdmin}
-              onOpenAddPassword={handleOpenAddPassword}
-              onEditPassword={handleEditPassword}
+              onAddPassword={addPassword}
+              onUpdatePassword={updatePassword}
               onDeletePassword={deletePassword}
               onLock={() => {
                 setIsPasswordUnlocked(false);
@@ -848,18 +826,6 @@ export default function App() {
         editingContact={editingContact}
       />
 
-      {/* Passwords Add / Edit Modal */}
-      <AddPasswordModal
-        isOpen={isAddPasswordOpen}
-        onClose={() => {
-          setIsAddPasswordOpen(false);
-          setEditingPassword(null);
-        }}
-        onSave={handleSavePassword}
-        editingPassword={editingPassword}
-        members={data.members}
-        activeMember={activeMember}
-      />
 
       {/* Admin PIN Prompt Modal */}
       <AdminPinPromptModal

@@ -1,25 +1,22 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   StickyNote,
   Plus,
   Search,
   Copy,
   Check,
-  Eye,
-  EyeOff,
   Edit2,
   Trash2,
-  Globe,
   ExternalLink,
   Share2,
   Lock,
   User,
   Users,
-  Key,
-  Mail,
-  FileText,
+  X,
   Filter,
   Sparkles,
+  Save,
+  Palette,
 } from 'lucide-react';
 import { Member, PasswordItem } from '../types';
 import { sounds } from '../lib/sound';
@@ -29,78 +26,94 @@ interface PasswordsViewProps {
   members: Member[];
   activeMember: Member | null;
   isAdmin?: boolean;
-  onOpenAddPassword: () => void;
-  onEditPassword: (password: PasswordItem) => void;
+  onAddPassword: (password: Partial<PasswordItem>) => void;
+  onUpdatePassword: (id: string, updates: Partial<PasswordItem>) => void;
   onDeletePassword: (id: string) => void;
   onLock?: () => void;
   fontSize?: 'normal' | 'large' | 'xlarge';
 }
 
-const POSTIT_THEMES: Record<string, {
-  card: string;
-  tape: string;
-  badge: string;
-  actionHover: string;
-  borderAccent: string;
-  name: string;
-}> = {
-  yellow: {
+const POSTIT_COLORS = [
+  {
+    id: 'yellow',
+    name: 'Amarillo',
     card: 'bg-amber-100/95 dark:bg-amber-950/80 border-amber-300/80 dark:border-amber-700/60 text-amber-950 dark:text-amber-100 shadow-md shadow-amber-900/5',
     tape: 'bg-amber-300/70 dark:bg-amber-600/40 border border-amber-400/40',
     badge: 'bg-amber-200/90 dark:bg-amber-900/80 text-amber-950 dark:text-amber-200 border-amber-300/80',
     actionHover: 'hover:bg-amber-200/90 dark:hover:bg-amber-900/70 text-amber-900 dark:text-amber-200',
-    borderAccent: 'border-amber-400',
-    name: 'Amarillo',
+    swatchBg: 'bg-amber-300',
+    dotClass: 'bg-amber-400 border-amber-500',
+    borderFocus: 'focus:border-amber-500 focus:ring-amber-500/30',
   },
-  pink: {
+  {
+    id: 'pink',
+    name: 'Rosa',
     card: 'bg-pink-100/95 dark:bg-pink-950/80 border-pink-300/80 dark:border-pink-700/60 text-pink-950 dark:text-pink-100 shadow-md shadow-pink-900/5',
     tape: 'bg-pink-300/70 dark:bg-pink-600/40 border border-pink-400/40',
     badge: 'bg-pink-200/90 dark:bg-pink-900/80 text-pink-950 dark:text-pink-200 border-pink-300/80',
     actionHover: 'hover:bg-pink-200/90 dark:hover:bg-pink-900/70 text-pink-900 dark:text-pink-200',
-    borderAccent: 'border-pink-400',
-    name: 'Rosa',
+    swatchBg: 'bg-pink-300',
+    dotClass: 'bg-pink-400 border-pink-500',
+    borderFocus: 'focus:border-pink-500 focus:ring-pink-500/30',
   },
-  green: {
+  {
+    id: 'green',
+    name: 'Verde',
     card: 'bg-emerald-100/95 dark:bg-emerald-950/80 border-emerald-300/80 dark:border-emerald-700/60 text-emerald-950 dark:text-emerald-100 shadow-md shadow-emerald-900/5',
     tape: 'bg-emerald-300/70 dark:bg-emerald-600/40 border border-emerald-400/40',
     badge: 'bg-emerald-200/90 dark:bg-emerald-900/80 text-emerald-950 dark:text-emerald-200 border-emerald-300/80',
     actionHover: 'hover:bg-emerald-200/90 dark:hover:bg-emerald-900/70 text-emerald-900 dark:text-emerald-200',
-    borderAccent: 'border-emerald-400',
-    name: 'Verde',
+    swatchBg: 'bg-emerald-300',
+    dotClass: 'bg-emerald-400 border-emerald-500',
+    borderFocus: 'focus:border-emerald-500 focus:ring-emerald-500/30',
   },
-  blue: {
+  {
+    id: 'blue',
+    name: 'Azul',
     card: 'bg-sky-100/95 dark:bg-sky-950/80 border-sky-300/80 dark:border-sky-700/60 text-sky-950 dark:text-sky-100 shadow-md shadow-sky-900/5',
     tape: 'bg-sky-300/70 dark:bg-sky-600/40 border border-sky-400/40',
     badge: 'bg-sky-200/90 dark:bg-sky-900/80 text-sky-950 dark:text-sky-200 border-sky-300/80',
     actionHover: 'hover:bg-sky-200/90 dark:hover:bg-sky-900/70 text-sky-900 dark:text-sky-200',
-    borderAccent: 'border-sky-400',
-    name: 'Azul',
+    swatchBg: 'bg-sky-300',
+    dotClass: 'bg-sky-400 border-sky-500',
+    borderFocus: 'focus:border-sky-500 focus:ring-sky-500/30',
   },
-  purple: {
+  {
+    id: 'purple',
+    name: 'Lavanda',
     card: 'bg-purple-100/95 dark:bg-purple-950/80 border-purple-300/80 dark:border-purple-700/60 text-purple-950 dark:text-purple-100 shadow-md shadow-purple-900/5',
     tape: 'bg-purple-300/70 dark:bg-purple-600/40 border border-purple-400/40',
     badge: 'bg-purple-200/90 dark:bg-purple-900/80 text-purple-950 dark:text-purple-200 border-purple-300/80',
     actionHover: 'hover:bg-purple-200/90 dark:hover:bg-purple-900/70 text-purple-900 dark:text-purple-200',
-    borderAccent: 'border-purple-400',
-    name: 'Lavanda',
+    swatchBg: 'bg-purple-300',
+    dotClass: 'bg-purple-400 border-purple-500',
+    borderFocus: 'focus:border-purple-500 focus:ring-purple-500/30',
   },
-  orange: {
+  {
+    id: 'orange',
+    name: 'Naranja',
     card: 'bg-orange-100/95 dark:bg-orange-950/80 border-orange-300/80 dark:border-orange-700/60 text-orange-950 dark:text-orange-100 shadow-md shadow-orange-900/5',
     tape: 'bg-orange-300/70 dark:bg-orange-600/40 border border-orange-400/40',
     badge: 'bg-orange-200/90 dark:bg-orange-900/80 text-orange-950 dark:text-orange-200 border-orange-300/80',
     actionHover: 'hover:bg-orange-200/90 dark:hover:bg-orange-900/70 text-orange-900 dark:text-orange-200',
-    borderAccent: 'border-orange-400',
-    name: 'Naranja',
+    swatchBg: 'bg-orange-300',
+    dotClass: 'bg-orange-400 border-orange-500',
+    borderFocus: 'focus:border-orange-500 focus:ring-orange-500/30',
   },
-};
+];
+
+const THEMES_MAP = POSTIT_COLORS.reduce((acc, c) => {
+  acc[c.id] = c;
+  return acc;
+}, {} as Record<string, typeof POSTIT_COLORS[0]>);
 
 export const PasswordsView: React.FC<PasswordsViewProps> = ({
   passwords,
   members,
   activeMember,
   isAdmin = false,
-  onOpenAddPassword,
-  onEditPassword,
+  onAddPassword,
+  onUpdatePassword,
   onDeletePassword,
   onLock,
   fontSize = 'normal',
@@ -108,16 +121,31 @@ export const PasswordsView: React.FC<PasswordsViewProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedMemberFilter, setSelectedMemberFilter] = useState<string>('all');
   const [selectedColorFilter, setSelectedColorFilter] = useState<string>('all');
-  const [revealedPasswords, setRevealedPasswords] = useState<Record<string, boolean>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // Toggle reveal password for a specific item
-  const toggleReveal = (id: string) => {
-    setRevealedPasswords((prev) => ({
-      ...prev,
-      [id]: !prev[id],
-    }));
-  };
+  // In-line creation state
+  const [isCreating, setIsCreating] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newNotes, setNewNotes] = useState('');
+  const [newMemberId, setNewMemberId] = useState('all');
+  const [newColor, setNewColor] = useState('yellow');
+  const newTitleInputRef = useRef<HTMLInputElement>(null);
+
+  // In-line editing state
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+  const [editMemberId, setEditMemberId] = useState('all');
+  const [editColor, setEditColor] = useState('yellow');
+
+  // Auto-focus when creation mode starts
+  useEffect(() => {
+    if (isCreating) {
+      setTimeout(() => {
+        newTitleInputRef.current?.focus();
+      }, 50);
+    }
+  }, [isCreating]);
 
   // Copy text to clipboard with sound and feedback
   const handleCopy = (text: string, identifier: string) => {
@@ -132,18 +160,86 @@ export const PasswordsView: React.FC<PasswordsViewProps> = ({
 
   // WhatsApp Share helper
   const handleShareWhatsApp = (item: PasswordItem) => {
-    let text = `📌 *NOTA RÁPIDA / ACCESO*\n` +
-      `🏷️ *Título:* ${item.website}\n`;
-    if (item.email) {
-      text += `👤 *Usuario / Correo:* \`${item.email}\`\n`;
-    }
-    if (item.password) {
-      text += `🔑 *Contraseña / PIN:* \`${item.password}\`\n`;
-    }
-    if (item.notes) {
-      text += `📝 *Nota:* ${item.notes}\n`;
-    }
-    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+    let text = `📌 *${item.website || 'NOTA RÁPIDA'}*\n\n` +
+      `${item.notes || ''}\n`;
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text.trim())}`, '_blank');
+  };
+
+  // Start in-line creation
+  const handleStartCreate = () => {
+    setIsCreating(true);
+    setEditingId(null);
+    setNewTitle('');
+    setNewNotes('');
+    setNewMemberId(selectedMemberFilter !== 'all' ? selectedMemberFilter : 'all');
+    setNewColor(selectedColorFilter !== 'all' ? selectedColorFilter : 'yellow');
+    sounds.playAddSound();
+  };
+
+  // Cancel in-line creation
+  const handleCancelCreate = () => {
+    setIsCreating(false);
+    setNewTitle('');
+    setNewNotes('');
+  };
+
+  // Submit in-line creation
+  const handleSaveNewNote = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmedTitle = newTitle.trim();
+    const trimmedNotes = newNotes.trim();
+    if (!trimmedTitle && !trimmedNotes) return;
+
+    onAddPassword({
+      website: trimmedTitle || (trimmedNotes ? trimmedNotes.slice(0, 30) : 'Nota Rápida'),
+      notes: trimmedNotes,
+      memberId: newMemberId || 'all',
+      color: newColor || 'yellow',
+      email: '',
+      password: '',
+      category: 'General',
+    });
+
+    sounds.playCheckSound();
+    setIsCreating(false);
+    setNewTitle('');
+    setNewNotes('');
+  };
+
+  // Start in-line editing of an existing note
+  const handleStartEdit = (item: PasswordItem) => {
+    setIsCreating(false);
+    setEditingId(item.id);
+    setEditTitle(item.website || '');
+    setEditNotes(item.notes || '');
+    setEditMemberId(item.memberId || 'all');
+    setEditColor(item.color || 'yellow');
+    sounds.playAddSound();
+  };
+
+  // Cancel in-line editing
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditTitle('');
+    setEditNotes('');
+  };
+
+  // Submit in-line editing
+  const handleSaveEdit = (id: string, e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmedTitle = editTitle.trim();
+    const trimmedNotes = editNotes.trim();
+    if (!trimmedTitle && !trimmedNotes) return;
+
+    onUpdatePassword(id, {
+      website: trimmedTitle || 'Nota Rápida',
+      notes: trimmedNotes,
+      memberId: editMemberId || 'all',
+      color: editColor || 'yellow',
+    });
+
+    sounds.playCheckSound();
+    setEditingId(null);
   };
 
   // Filter passwords based on permissions, search term, member, and color
@@ -172,17 +268,15 @@ export const PasswordsView: React.FC<PasswordsViewProps> = ({
 
     return baseList.filter((p) => {
       const matchWeb = (p.website || '').toLowerCase().includes(term);
-      const matchEmail = (p.email || '').toLowerCase().includes(term);
       const matchNotes = (p.notes || '').toLowerCase().includes(term);
-      const matchCat = (p.category || '').toLowerCase().includes(term);
-      return matchWeb || matchEmail || matchNotes || matchCat;
+      return matchWeb || matchNotes;
     });
   }, [passwords, isAdmin, activeMember, selectedMemberFilter, selectedColorFilter, searchTerm]);
 
   const formatWebsiteUrl = (web: string) => {
-    let clean = web.trim();
+    let clean = (web || '').trim();
     if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
-      if (clean.includes('.')) {
+      if (clean.includes('.') && !clean.includes(' ')) {
         clean = 'https://' + clean;
       } else {
         return null;
@@ -229,7 +323,7 @@ export const PasswordsView: React.FC<PasswordsViewProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white tracking-tight">
-                  Tablón de Notas Rápidas y Claves
+                  Tablón de Notas Rápidas
                 </h1>
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-900/60">
                   {filteredPasswords.length} {filteredPasswords.length === 1 ? 'nota' : 'notas'}
@@ -237,8 +331,8 @@ export const PasswordsView: React.FC<PasswordsViewProps> = ({
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 {isAdmin
-                  ? 'Panel de notas tipo Post-it con escritura libre, claves y asignación de propietario'
-                  : `Notas rápidas y accesos asignados a ${activeMember?.name || 'ti'} (Solo Lectura)`}
+                  ? 'Notas tipo Post-it con escritura libre, títulos y usuario asignado'
+                  : `Notas rápidas asignadas a ${activeMember?.name || 'ti'} (Solo Lectura)`}
               </p>
             </div>
           </div>
@@ -256,14 +350,14 @@ export const PasswordsView: React.FC<PasswordsViewProps> = ({
               </button>
             )}
 
-            {/* Add Post-It Button (Admin Only) */}
-            {isAdmin && (
+            {/* Add Post-It In-Line Button (Admin Only) */}
+            {isAdmin && !isCreating && (
               <button
-                onClick={onOpenAddPassword}
-                className="flex-1 sm:flex-initial px-4 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs shrink-0 border border-amber-600"
+                onClick={handleStartCreate}
+                className="flex-1 sm:flex-initial px-4 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs shrink-0 border border-amber-600"
               >
                 <Plus className="w-4 h-4 stroke-[3]" />
-                <span>Nueva Nota Post-It</span>
+                <span>Nueva Nota</span>
               </button>
             )}
           </div>
@@ -274,7 +368,7 @@ export const PasswordsView: React.FC<PasswordsViewProps> = ({
           <div className="p-3 bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200/70 dark:border-amber-900/50 rounded-2xl flex items-center gap-2.5 text-xs text-amber-900 dark:text-amber-200">
             <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
             <span>
-              <strong>Vista de Solo Lectura:</strong> Puedes consultar y copiar tus notas y accesos asignados. Solo el administrador puede crear o modificar notas.
+              <strong>Modo Consulta:</strong> Puedes leer y copiar tus notas rápidas asignadas. Solo el administrador puede crear o modificar notas.
             </span>
           </div>
         )}
@@ -288,7 +382,7 @@ export const PasswordsView: React.FC<PasswordsViewProps> = ({
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Buscar por título, contenido libre, usuario, servicio..."
+              placeholder="Buscar notas por título o texto..."
               className="w-full pl-9 pr-4 py-2 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 outline-none focus:ring-2 focus:ring-amber-500/30"
             />
             {searchTerm && (
@@ -314,17 +408,17 @@ export const PasswordsView: React.FC<PasswordsViewProps> = ({
             >
               Todos los Colores
             </button>
-            {Object.entries(POSTIT_THEMES).map(([colorKey, theme]) => {
-              const isSelected = selectedColorFilter === colorKey;
+            {POSTIT_COLORS.map((c) => {
+              const isSelected = selectedColorFilter === c.id;
               return (
                 <button
-                  key={colorKey}
+                  key={c.id}
                   type="button"
-                  onClick={() => setSelectedColorFilter(colorKey)}
-                  className={`w-7 h-7 rounded-xl flex items-center justify-center transition-all cursor-pointer shrink-0 border ${theme.tape} ${
+                  onClick={() => setSelectedColorFilter(c.id)}
+                  className={`w-7 h-7 rounded-xl flex items-center justify-center transition-all cursor-pointer shrink-0 border ${c.tape} ${
                     isSelected ? 'ring-2 ring-offset-2 ring-slate-900 dark:ring-white scale-110' : 'opacity-70 hover:opacity-100'
                   }`}
-                  title={`Filtrar por color ${theme.name}`}
+                  title={`Filtrar por color ${c.name}`}
                 >
                   <span className="w-2.5 h-2.5 rounded-full border border-black/20" />
                 </button>
@@ -375,8 +469,8 @@ export const PasswordsView: React.FC<PasswordsViewProps> = ({
         )}
       </div>
 
-      {/* ================= EMPTY STATE ================= */}
-      {filteredPasswords.length === 0 && (
+      {/* ================= EMPTY STATE (When no creation & no notes) ================= */}
+      {filteredPasswords.length === 0 && !isCreating && (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 p-10 text-center space-y-3">
           <div className="w-14 h-14 rounded-3xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 flex items-center justify-center mx-auto border border-amber-200 dark:border-amber-900/50 shadow-2xs">
             <StickyNote className="w-7 h-7 text-amber-500" />
@@ -385,253 +479,381 @@ export const PasswordsView: React.FC<PasswordsViewProps> = ({
             <h3 className="text-base font-black text-slate-900 dark:text-white">
               {searchTerm || selectedColorFilter !== 'all' || selectedMemberFilter !== 'all'
                 ? 'No se encontraron notas con estos filtros'
-                : 'No hay notas adhesivas registradas'}
+                : 'No hay notas registradas'}
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
               {searchTerm || selectedColorFilter !== 'all' || selectedMemberFilter !== 'all'
-                ? 'Intenta restablecer la búsqueda o cambiar los filtros superiores.'
+                ? 'Intenta restablecer la búsqueda o cambiar los filtros.'
                 : isAdmin
-                ? 'Crea tu primera nota tipo Post-It para anotar claves WiFi, accesos de streaming o recordatorios.'
-                : 'Aún no tienes notas o contraseñas asignadas por el administrador.'}
+                ? 'Crea tu primera nota adhesiva con escritura libre y asígnala al familiar deseado.'
+                : 'Aún no tienes notas asignadas por el administrador.'}
             </p>
           </div>
           {isAdmin && (
             <button
-              onClick={onOpenAddPassword}
-              className="px-4 py-2 rounded-2xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-xs border border-amber-600"
+              onClick={handleStartCreate}
+              className="px-4 py-2 rounded-2xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-xs border border-amber-600"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Crear Primera Nota Adhesiva</span>
+              <span>Crear Primera Nota</span>
             </button>
           )}
         </div>
       )}
 
       {/* ================= POST-IT STICKY NOTES GRID ================= */}
-      {filteredPasswords.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredPasswords.map((item) => {
-            const colorKey = item.color && POSTIT_THEMES[item.color] ? item.color : 'yellow';
-            const theme = POSTIT_THEMES[colorKey];
-            const ownerBadge = getOwnerBadge(item.memberId);
-            const isRevealed = !!revealedPasswords[item.id];
-            const isCopiedPass = copiedId === `pass_${item.id}`;
-            const isCopiedEmail = copiedId === `email_${item.id}`;
-            const isCopiedNote = copiedId === `note_${item.id}`;
-            const isCopiedAll = copiedId === `all_${item.id}`;
-            const webUrl = formatWebsiteUrl(item.website);
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        {/* ================= IN-LINE CREATION CARD ================= */}
+        {isCreating && (
+          <div
+            className={`relative rounded-3xl p-5 border-2 border-dashed flex flex-col justify-between transition-all duration-200 shadow-xl ${
+              THEMES_MAP[newColor]?.card || THEMES_MAP.yellow.card
+            }`}
+          >
+            {/* Visual Scotch Tape */}
+            <div
+              className={`w-24 h-4 mx-auto -mt-7 mb-3 rounded-xs backdrop-blur-md opacity-85 rotate-[-0.5deg] shadow-2xs ${
+                THEMES_MAP[newColor]?.tape || THEMES_MAP.yellow.tape
+              }`}
+            />
 
+            {/* In-line Controls: Color Dots & Owner Select */}
+            <div className="space-y-3 flex-1">
+              <div className="flex items-center justify-between gap-2 flex-wrap pb-2 border-b border-black/10 dark:border-white/10">
+                {/* Color Selector Dots */}
+                <div className="flex items-center gap-1.5">
+                  <Palette className="w-3.5 h-3.5 opacity-60 mr-0.5" />
+                  {POSTIT_COLORS.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => setNewColor(c.id)}
+                      className={`w-5 h-5 rounded-full border border-black/20 transition-transform cursor-pointer ${c.dotClass} ${
+                        newColor === c.id ? 'scale-125 ring-2 ring-slate-950 dark:ring-white' : 'opacity-70 hover:opacity-100'
+                      }`}
+                      title={c.name}
+                    />
+                  ))}
+                </div>
+
+                {/* Owner Select */}
+                <div className="flex items-center gap-1">
+                  <User className="w-3.5 h-3.5 opacity-60" />
+                  <select
+                    value={newMemberId}
+                    onChange={(e) => setNewMemberId(e.target.value)}
+                    className="text-xs font-bold bg-white/70 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-xl px-2 py-1 outline-none cursor-pointer"
+                  >
+                    <option value="all">👥 Toda la Familia</option>
+                    {members.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        👤 {m.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Title Input */}
+              <div>
+                <input
+                  ref={newTitleInputRef}
+                  type="text"
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  placeholder="Título de la nota (ej. Clave WiFi, Instrucciones...)"
+                  className="w-full px-3 py-2 text-sm sm:text-base font-black bg-white/60 dark:bg-black/30 border border-black/10 dark:border-white/10 rounded-xl placeholder-slate-500/70 outline-none focus:ring-2 focus:ring-amber-500/40"
+                  onKeyDown={(e) => {
+                    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                      handleSaveNewNote();
+                    }
+                  }}
+                />
+              </div>
+
+              {/* Free-form Note Textarea */}
+              <div>
+                <textarea
+                  rows={4}
+                  value={newNotes}
+                  onChange={(e) => setNewNotes(e.target.value)}
+                  placeholder="Escribe libremente aquí tu nota, recordatorio, instrucciones o claves..."
+                  className="w-full px-3 py-2.5 text-xs sm:text-sm bg-white/60 dark:bg-black/30 border border-black/10 dark:border-white/10 rounded-xl placeholder-slate-500/70 outline-none focus:ring-2 focus:ring-amber-500/40 resize-none font-sans leading-relaxed"
+                  onKeyDown={(e) => {
+                    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                      handleSaveNewNote();
+                    }
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* In-line Bottom Actions */}
+            <div className="pt-3 mt-3 border-t border-black/10 dark:border-white/10 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={handleCancelCreate}
+                className="px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-black/10 dark:hover:bg-white/10 transition-colors cursor-pointer flex items-center gap-1"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>Cancelar</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSaveNewNote()}
+                disabled={!newTitle.trim() && !newNotes.trim()}
+                className="px-4 py-1.5 rounded-xl text-xs font-black bg-slate-950 text-white dark:bg-white dark:text-slate-950 transition-all cursor-pointer flex items-center gap-1.5 shadow-sm hover:scale-105 disabled:opacity-40"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>Guardar Nota</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ================= EXISTING POST-IT NOTES ================= */}
+        {filteredPasswords.map((item) => {
+          const isBeingEdited = editingId === item.id;
+          const colorKey = item.color && THEMES_MAP[item.color] ? item.color : 'yellow';
+          const theme = THEMES_MAP[colorKey];
+          const ownerBadge = getOwnerBadge(item.memberId);
+          const isCopiedNote = copiedId === `note_${item.id}`;
+          const webUrl = formatWebsiteUrl(item.website);
+
+          // Render in-line editor if this note is being edited
+          if (isBeingEdited) {
+            const editTheme = THEMES_MAP[editColor] || theme;
             return (
               <div
                 key={item.id}
-                className={`relative rounded-3xl p-5 border transition-all duration-200 hover:-translate-y-1 hover:shadow-xl flex flex-col justify-between group ${theme.card}`}
+                className={`relative rounded-3xl p-5 border-2 border-amber-400 flex flex-col justify-between transition-all duration-200 shadow-xl ${editTheme.card}`}
               >
-                {/* Visual Scotch / Washi Tape at Top */}
+                {/* Visual Scotch Tape */}
                 <div
-                  className={`w-24 h-4 mx-auto -mt-7 mb-3 rounded-xs backdrop-blur-md opacity-85 rotate-[-0.5deg] shadow-2xs ${theme.tape}`}
+                  className={`w-24 h-4 mx-auto -mt-7 mb-3 rounded-xs backdrop-blur-md opacity-85 rotate-[-0.5deg] shadow-2xs ${editTheme.tape}`}
                 />
 
-                {/* Top Bar: Owner Badge & Category */}
-                <div className="flex items-center justify-between gap-2 mb-3">
-                  <div
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-black border backdrop-blur-xs ${theme.badge}`}
-                  >
-                    {ownerBadge.isAll ? (
-                      <Users className="w-3 h-3" />
-                    ) : (
-                      <span className={`w-2 h-2 rounded-full ${ownerBadge.avatarColor}`} />
-                    )}
-                    <span>{ownerBadge.label}</span>
-                  </div>
-
-                  {item.category && item.category !== 'General' && (
-                    <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-lg bg-black/5 dark:bg-white/10 opacity-80">
-                      {item.category}
-                    </span>
-                  )}
-                </div>
-
-                {/* Card Main Body */}
+                {/* Edit Controls: Color Dots & Owner Select */}
                 <div className="space-y-3 flex-1">
-                  {/* Title / Service */}
-                  <div className="flex items-start justify-between gap-2">
-                    <h2 className="text-base sm:text-lg font-black tracking-tight leading-snug break-words">
-                      {item.website}
-                    </h2>
-                    {webUrl && (
-                      <a
-                        href={webUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-1 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 transition-colors opacity-70 hover:opacity-100 shrink-0"
-                        title={`Abrir enlace: ${item.website}`}
+                  <div className="flex items-center justify-between gap-2 flex-wrap pb-2 border-b border-black/10 dark:border-white/10">
+                    {/* Color Dots */}
+                    <div className="flex items-center gap-1.5">
+                      <Palette className="w-3.5 h-3.5 opacity-60 mr-0.5" />
+                      {POSTIT_COLORS.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => setEditColor(c.id)}
+                          className={`w-5 h-5 rounded-full border border-black/20 transition-transform cursor-pointer ${c.dotClass} ${
+                            editColor === c.id ? 'scale-125 ring-2 ring-slate-950 dark:ring-white' : 'opacity-70 hover:opacity-100'
+                          }`}
+                          title={c.name}
+                        />
+                      ))}
+                    </div>
+
+                    {/* Owner Select */}
+                    <div className="flex items-center gap-1">
+                      <User className="w-3.5 h-3.5 opacity-60" />
+                      <select
+                        value={editMemberId}
+                        onChange={(e) => setEditMemberId(e.target.value)}
+                        className="text-xs font-bold bg-white/70 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-xl px-2 py-1 outline-none cursor-pointer"
                       >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </a>
-                    )}
+                        <option value="all">👥 Toda la Familia</option>
+                        {members.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            👤 {m.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
 
-                  {/* Free-form Note Text Content */}
-                  {item.notes && (
-                    <div className="relative p-3 rounded-2xl bg-white/40 dark:bg-black/20 border border-black/5 dark:border-white/5 group/note">
-                      <p className="text-xs sm:text-sm whitespace-pre-wrap leading-relaxed font-sans select-text">
-                        {item.notes}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => handleCopy(item.notes || '', `note_${item.id}`)}
-                        className="absolute top-2 right-2 p-1 rounded-md opacity-60 hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/10 transition-all cursor-pointer"
-                        title="Copiar texto de la nota"
-                      >
-                        {isCopiedNote ? (
-                          <Check className="w-3 h-3 text-emerald-700 dark:text-emerald-400 stroke-[3]" />
-                        ) : (
-                          <Copy className="w-3 h-3" />
-                        )}
-                      </button>
-                    </div>
-                  )}
+                  {/* Title Input */}
+                  <div>
+                    <input
+                      type="text"
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      placeholder="Título de la nota..."
+                      className="w-full px-3 py-2 text-sm sm:text-base font-black bg-white/60 dark:bg-black/30 border border-black/10 dark:border-white/10 rounded-xl placeholder-slate-500/70 outline-none focus:ring-2 focus:ring-amber-500/40"
+                      onKeyDown={(e) => {
+                        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                          handleSaveEdit(item.id);
+                        }
+                      }}
+                    />
+                  </div>
 
-                  {/* Optional Credential Boxes */}
-                  {(item.email || item.password) && (
-                    <div className="space-y-2 pt-1">
-                      {/* Correo / Usuario */}
-                      {item.email && (
-                        <div className="flex items-center justify-between gap-2 p-2 px-3 rounded-xl bg-white/50 dark:bg-black/30 border border-black/5 dark:border-white/5 text-xs">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <Mail className="w-3.5 h-3.5 opacity-60 shrink-0" />
-                            <span className="font-semibold truncate select-all">{item.email}</span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => handleCopy(item.email, `email_${item.id}`)}
-                            className="p-1 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 transition-colors cursor-pointer shrink-0"
-                            title="Copiar usuario / correo"
-                          >
-                            {isCopiedEmail ? (
-                              <Check className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400 stroke-[3]" />
-                            ) : (
-                              <Copy className="w-3.5 h-3.5 opacity-70" />
-                            )}
-                          </button>
-                        </div>
-                      )}
-
-                      {/* Contraseña / Clave */}
-                      {item.password && (
-                        <div className="flex items-center justify-between gap-2 p-2 px-3 rounded-xl bg-white/50 dark:bg-black/30 border border-black/5 dark:border-white/5 text-xs font-mono">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <Key className="w-3.5 h-3.5 opacity-60 shrink-0" />
-                            <span className="font-bold truncate select-all tracking-wider">
-                              {isRevealed ? item.password : '••••••••••••'}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1 shrink-0">
-                            <button
-                              type="button"
-                              onClick={() => toggleReveal(item.id)}
-                              className="p-1 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                              title={isRevealed ? 'Ocultar contraseña' : 'Ver contraseña'}
-                            >
-                              {isRevealed ? (
-                                <EyeOff className="w-3.5 h-3.5 opacity-80" />
-                              ) : (
-                                <Eye className="w-3.5 h-3.5 opacity-80" />
-                              )}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleCopy(item.password, `pass_${item.id}`)}
-                              className="p-1 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                              title="Copiar contraseña"
-                            >
-                              {isCopiedPass ? (
-                                <Check className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400 stroke-[3]" />
-                              ) : (
-                                <Copy className="w-3.5 h-3.5 opacity-70" />
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  {/* Note Content Textarea */}
+                  <div>
+                    <textarea
+                      rows={4}
+                      value={editNotes}
+                      onChange={(e) => setEditNotes(e.target.value)}
+                      placeholder="Escribe aquí tu nota..."
+                      className="w-full px-3 py-2.5 text-xs sm:text-sm bg-white/60 dark:bg-black/30 border border-black/10 dark:border-white/10 rounded-xl placeholder-slate-500/70 outline-none focus:ring-2 focus:ring-amber-500/40 resize-none font-sans leading-relaxed"
+                      onKeyDown={(e) => {
+                        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                          handleSaveEdit(item.id);
+                        }
+                      }}
+                    />
+                  </div>
                 </div>
 
-                {/* Card Bottom Bar: Date & Actions */}
-                <div className="pt-3 mt-3 border-t border-black/10 dark:border-white/10 flex items-center justify-between gap-2">
-                  {/* Copy All Info Button */}
+                {/* Edit Bottom Actions */}
+                <div className="pt-3 mt-3 border-t border-black/10 dark:border-white/10 flex items-center justify-end gap-2">
                   <button
                     type="button"
-                    onClick={() => {
-                      let full = `📌 ${item.website}\n`;
-                      if (item.email) full += `👤 Usuario: ${item.email}\n`;
-                      if (item.password) full += `🔑 Clave: ${item.password}\n`;
-                      if (item.notes) full += `📝 Nota: ${item.notes}\n`;
-                      handleCopy(full.trim(), `all_${item.id}`);
-                    }}
-                    className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer bg-white/40 dark:bg-black/20 ${theme.actionHover}`}
-                    title="Copiar todo el contenido de la nota"
+                    onClick={handleCancelEdit}
+                    className="px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-black/10 dark:hover:bg-white/10 transition-colors cursor-pointer flex items-center gap-1"
                   >
-                    {isCopiedAll ? (
-                      <>
-                        <Check className="w-3 h-3 text-emerald-700 dark:text-emerald-400 stroke-[3]" />
-                        <span>¡Copiado!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3 h-3 opacity-75" />
-                        <span>Copiar Todo</span>
-                      </>
-                    )}
+                    <X className="w-3.5 h-3.5" />
+                    <span>Cancelar</span>
                   </button>
-
-                  {/* Actions Group */}
-                  <div className="flex items-center gap-1">
-                    {/* Share WhatsApp */}
-                    <button
-                      type="button"
-                      onClick={() => handleShareWhatsApp(item)}
-                      className={`p-1.5 rounded-xl hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 transition-colors cursor-pointer`}
-                      title="Compartir nota por WhatsApp"
-                    >
-                      <Share2 className="w-4 h-4" />
-                    </button>
-
-                    {/* Admin Edit Button */}
-                    {isAdmin && (
-                      <button
-                        type="button"
-                        onClick={() => onEditPassword(item)}
-                        className={`p-1.5 rounded-xl hover:bg-black/10 dark:hover:bg-white/10 opacity-75 hover:opacity-100 transition-colors cursor-pointer`}
-                        title="Editar nota adhesiva"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                    )}
-
-                    {/* Admin Delete Button */}
-                    {isAdmin && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (window.confirm(`¿Seguro que deseas eliminar la nota "${item.website}"?`)) {
-                            onDeletePassword(item.id);
-                          }
-                        }}
-                        className={`p-1.5 rounded-xl hover:bg-red-500/20 text-red-700 dark:text-red-400 transition-colors cursor-pointer`}
-                        title="Eliminar nota adhesiva"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleSaveEdit(item.id)}
+                    disabled={!editTitle.trim() && !editNotes.trim()}
+                    className="px-4 py-1.5 rounded-xl text-xs font-black bg-slate-950 text-white dark:bg-white dark:text-slate-950 transition-all cursor-pointer flex items-center gap-1.5 shadow-sm hover:scale-105 disabled:opacity-40"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>Guardar Cambios</span>
+                  </button>
                 </div>
               </div>
             );
-          })}
-        </div>
-      )}
+          }
+
+          // ================= VIEW ONLY CARD =================
+          return (
+            <div
+              key={item.id}
+              className={`relative rounded-3xl p-5 border transition-all duration-200 hover:-translate-y-1 hover:shadow-xl flex flex-col justify-between group ${theme.card}`}
+            >
+              {/* Visual Scotch Tape */}
+              <div
+                className={`w-24 h-4 mx-auto -mt-7 mb-3 rounded-xs backdrop-blur-md opacity-85 rotate-[-0.5deg] shadow-2xs ${theme.tape}`}
+              />
+
+              {/* Top Bar: Owner Badge */}
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-black border backdrop-blur-xs ${theme.badge}`}
+                >
+                  {ownerBadge.isAll ? (
+                    <Users className="w-3 h-3" />
+                  ) : (
+                    <span className={`w-2 h-2 rounded-full ${ownerBadge.avatarColor}`} />
+                  )}
+                  <span>{ownerBadge.label}</span>
+                </div>
+              </div>
+
+              {/* Card Body: Title & Free-form Notes */}
+              <div className="space-y-2.5 flex-1">
+                {/* Title */}
+                <div className="flex items-start justify-between gap-2">
+                  <h2 className="text-base sm:text-lg font-black tracking-tight leading-snug break-words">
+                    {item.website}
+                  </h2>
+                  {webUrl && (
+                    <a
+                      href={webUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-1 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 transition-colors opacity-70 hover:opacity-100 shrink-0"
+                      title={`Abrir enlace: ${item.website}`}
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  )}
+                </div>
+
+                {/* Free-form Note Content */}
+                {item.notes ? (
+                  <div className="p-3 rounded-2xl bg-white/40 dark:bg-black/20 border border-black/5 dark:border-white/5">
+                    <p className="text-xs sm:text-sm whitespace-pre-wrap leading-relaxed font-sans select-text">
+                      {item.notes}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="p-2 text-xs italic opacity-40">Sin contenido adicional</div>
+                )}
+              </div>
+
+              {/* Card Bottom Bar: Copy & Actions */}
+              <div className="pt-3 mt-3 border-t border-black/10 dark:border-white/10 flex items-center justify-between gap-2">
+                {/* Copy Note Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const full = `${item.website ? `📌 ${item.website}\n\n` : ''}${item.notes || ''}`.trim();
+                    handleCopy(full, `note_${item.id}`);
+                  }}
+                  className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer bg-white/40 dark:bg-black/20 ${theme.actionHover}`}
+                  title="Copiar texto de la nota"
+                >
+                  {isCopiedNote ? (
+                    <>
+                      <Check className="w-3 h-3 text-emerald-700 dark:text-emerald-400 stroke-[3]" />
+                      <span>¡Copiado!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3 h-3 opacity-75" />
+                      <span>Copiar</span>
+                    </>
+                  )}
+                </button>
+
+                {/* Actions Group */}
+                <div className="flex items-center gap-1">
+                  {/* Share WhatsApp */}
+                  <button
+                    type="button"
+                    onClick={() => handleShareWhatsApp(item)}
+                    className="p-1.5 rounded-xl hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 transition-colors cursor-pointer"
+                    title="Compartir por WhatsApp"
+                  >
+                    <Share2 className="w-4 h-4" />
+                  </button>
+
+                  {/* Admin Edit Button (In-Line) */}
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => handleStartEdit(item)}
+                      className="p-1.5 rounded-xl hover:bg-black/10 dark:hover:bg-white/10 opacity-75 hover:opacity-100 transition-colors cursor-pointer"
+                      title="Editar nota in-line"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                  )}
+
+                  {/* Admin Delete Button */}
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (window.confirm(`¿Seguro que deseas eliminar la nota "${item.website}"?`)) {
+                          onDeletePassword(item.id);
+                        }
+                      }}
+                      className="p-1.5 rounded-xl hover:bg-red-500/20 text-red-700 dark:text-red-400 transition-colors cursor-pointer"
+                      title="Eliminar nota"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };
