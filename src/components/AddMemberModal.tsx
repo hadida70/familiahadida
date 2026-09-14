@@ -102,12 +102,12 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
                 maxLength={8}
                 value={pin}
                 onChange={(e) => setPin(e.target.value.replace(/[^0-9]/g, ''))}
-                placeholder="1474"
+                placeholder="4 a 8 dígitos"
                 required
                 className="w-full px-4 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-red-500 text-slate-900 dark:text-white font-mono font-bold text-base outline-none tracking-widest text-center"
               />
               <p className="text-[11px] text-slate-400 mt-1">
-                Predeterminado: <strong>1474</strong>. El usuario usará este PIN para iniciar sesión.
+                El usuario usará este PIN personal para ingresar a su sesión.
               </p>
             </div>
 

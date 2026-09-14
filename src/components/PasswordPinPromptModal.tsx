@@ -19,7 +19,7 @@ export const PasswordPinPromptModal: React.FC<PasswordPinPromptModalProps> = ({
   onClose,
   onSuccess,
   title = 'Acceso a Claves',
-  subtitle = 'Introduce el PIN de seguridad (1474) para ver y gestionar las claves.',
+  subtitle = 'Introduce tu PIN de seguridad para ver y gestionar las claves.',
   activeMember,
   onLogin,
 }) => {
@@ -201,7 +201,7 @@ export const PasswordPinPromptModal: React.FC<PasswordPinPromptModalProps> = ({
 
         <div className="mt-4 text-[11px] text-slate-500 flex items-center justify-center gap-1">
           <ShieldCheck className="w-3.5 h-3.5 text-red-400" />
-          <span>PIN: 1474</span>
+          <span>Sección Protegida</span>
         </div>
       </div>
     </div>

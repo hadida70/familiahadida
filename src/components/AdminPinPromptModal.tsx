@@ -114,7 +114,7 @@ export const AdminPinPromptModal: React.FC<AdminPinPromptModalProps> = ({
           {actionTitle}
         </h2>
         <p className="text-xs text-slate-400 mb-4 max-w-xs">
-          Ingresa el PIN de Administrador (<strong>1474</strong>) para desbloquear todas las facultades de la aplicación.
+          Ingresa el PIN de Administrador para desbloquear todas las facultades de la aplicación.
         </p>
 
         {/* PIN Indicator Dots */}
@@ -182,7 +182,7 @@ export const AdminPinPromptModal: React.FC<AdminPinPromptModalProps> = ({
 
         <div className="mt-4 text-[11px] text-slate-500 flex items-center justify-center gap-1">
           <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-          <span>PIN Maestro: 1474</span>
+          <span>Modo Administrador Protegido</span>
         </div>
       </div>
     </div>

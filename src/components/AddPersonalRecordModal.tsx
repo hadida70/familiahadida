@@ -940,7 +940,7 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
                           type={showAtmPin ? 'text' : 'password'}
                           value={cardAtmPin}
                           onChange={handleAtmPinChange}
-                          placeholder="Ej: 1474"
+                          placeholder="Ej: 1234"
                           maxLength={8}
                           className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 text-center tracking-widest focus:outline-hidden focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
                         />

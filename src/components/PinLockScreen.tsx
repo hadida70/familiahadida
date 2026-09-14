@@ -245,8 +245,8 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
 
           <p className="text-[11px] text-slate-400 mb-3 text-center">
             {isSelectedAdmin
-              ? 'Introduce tu PIN (predeterminado 1474) para acceso completo.'
-              : 'Introduce tu PIN (predeterminado 1474) para acceder a tu sesión.'}
+              ? 'Introduce tu PIN de seguridad para acceso completo.'
+              : 'Introduce tu PIN de seguridad para acceder a tu sesión.'}
           </p>
 
           {/* PIN Dots Indicator */}
@@ -326,7 +326,7 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
 
         <div className="mt-4 text-center text-slate-500 text-xs flex items-center justify-center gap-1.5">
           <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-          <span>PIN Inicial de acceso: <strong>1474</strong></span>
+          <span>Acceso protegido • Familia Hadida</span>
         </div>
       </div>
     </div>

@@ -847,7 +847,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
       <div className="flex flex-col lg:flex-row items-start gap-6">
         
         {/* ================= DESKTOP LEFT SIDEBAR (lg:flex) ================= */}
-        <aside className="hidden lg:flex flex-col w-72 shrink-0 sticky top-20 bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-5">
+        <aside className="hidden lg:flex flex-col w-72 shrink-0 sticky top-20 bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-5 max-h-[calc(100vh-6rem)] overflow-y-auto custom-scrollbar overscroll-contain">
           {renderSidebarContent(false)}
         </aside>
 

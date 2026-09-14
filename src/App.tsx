@@ -657,7 +657,7 @@ export default function App() {
                   Sección Bloqueada
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Introduce tu PIN de seguridad (1474) para desbloquear y ver las claves guardadas.
+                  Introduce tu PIN de seguridad para desbloquear y ver las claves guardadas.
                 </p>
               </div>
               <button

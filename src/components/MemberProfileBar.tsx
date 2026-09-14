@@ -60,10 +60,10 @@ export const MemberProfileBar: React.FC<MemberProfileBarProps> = ({
               <button
                 onClick={onRequestAdminUnlock}
                 className="flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-bold border bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-all cursor-pointer shadow-2xs"
-                title="Desbloquear facultades de Administrador con PIN 1474"
+                title="Desbloquear facultades de Administrador"
               >
                 <Crown className="w-3.5 h-3.5 text-amber-500" />
-                <span className="hidden sm:inline">Modo Admin (PIN 1474)</span>
+                <span className="hidden sm:inline">Modo Admin</span>
                 <span className="sm:hidden">Admin</span>
               </button>
             )}
