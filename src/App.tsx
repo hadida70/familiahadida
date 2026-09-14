@@ -483,7 +483,7 @@ export default function App() {
               )}
             </button>
 
-            {/* Tab: NOTAS Y CLAVES (Post-It) */}
+            {/* Tab: CLAVES (Post-It) */}
             <button
               onClick={() => handleSelectTab('passwords')}
               className={`px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 transition-all cursor-pointer border shrink-0 ${
@@ -493,7 +493,7 @@ export default function App() {
               }`}
             >
               <StickyNote className="w-4 h-4" />
-              <span>NOTAS Y CLAVES</span>
+              <span>CLAVES</span>
               {totalPasswords > 0 && (
                 <span
                   className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
@@ -657,7 +657,7 @@ export default function App() {
                   Sección Bloqueada
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Introduce tu PIN de seguridad (1474) para desbloquear y ver las contraseñas guardadas.
+                  Introduce tu PIN de seguridad (1474) para desbloquear y ver las claves guardadas.
                 </p>
               </div>
               <button

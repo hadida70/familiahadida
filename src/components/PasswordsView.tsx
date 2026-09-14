@@ -160,7 +160,7 @@ export const PasswordsView: React.FC<PasswordsViewProps> = ({
 
   // WhatsApp Share helper
   const handleShareWhatsApp = (item: PasswordItem) => {
-    let text = `📌 *${item.website || 'NOTA RÁPIDA'}*\n\n` +
+    let text = `🔑 *${item.website || 'CLAVE'}*\n\n` +
       `${item.notes || ''}\n`;
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text.trim())}`, '_blank');
   };
@@ -191,7 +191,7 @@ export const PasswordsView: React.FC<PasswordsViewProps> = ({
     if (!trimmedTitle && !trimmedNotes) return;
 
     onAddPassword({
-      website: trimmedTitle || (trimmedNotes ? trimmedNotes.slice(0, 30) : 'Nota Rápida'),
+      website: trimmedTitle || (trimmedNotes ? trimmedNotes.slice(0, 30) : 'Clave'),
       notes: trimmedNotes,
       memberId: newMemberId || 'all',
       color: newColor || 'yellow',
@@ -232,7 +232,7 @@ export const PasswordsView: React.FC<PasswordsViewProps> = ({
     if (!trimmedTitle && !trimmedNotes) return;
 
     onUpdatePassword(id, {
-      website: trimmedTitle || 'Nota Rápida',
+      website: trimmedTitle || 'Clave',
       notes: trimmedNotes,
       memberId: editMemberId || 'all',
       color: editColor || 'yellow',
@@ -323,16 +323,16 @@ export const PasswordsView: React.FC<PasswordsViewProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white tracking-tight">
-                  Tablón de Notas Rápidas
+                  Tablón de Claves
                 </h1>
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-900/60">
-                  {filteredPasswords.length} {filteredPasswords.length === 1 ? 'nota' : 'notas'}
+                  {filteredPasswords.length} {filteredPasswords.length === 1 ? 'clave' : 'claves'}
                 </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 {isAdmin
-                  ? 'Notas tipo Post-it con escritura libre, títulos y usuario asignado'
-                  : `Notas rápidas asignadas a ${activeMember?.name || 'ti'} (Solo Lectura)`}
+                  ? 'Claves con escritura libre, títulos y usuario asignado'
+                  : `Claves asignadas a ${activeMember?.name || 'ti'} (Solo Lectura)`}
               </p>
             </div>
           </div>
@@ -357,7 +357,7 @@ export const PasswordsView: React.FC<PasswordsViewProps> = ({
                 className="flex-1 sm:flex-initial px-4 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs shrink-0 border border-amber-600"
               >
                 <Plus className="w-4 h-4 stroke-[3]" />
-                <span>Nueva Nota</span>
+                <span>Nueva Clave</span>
               </button>
             )}
           </div>
@@ -368,7 +368,7 @@ export const PasswordsView: React.FC<PasswordsViewProps> = ({
           <div className="p-3 bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200/70 dark:border-amber-900/50 rounded-2xl flex items-center gap-2.5 text-xs text-amber-900 dark:text-amber-200">
             <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
             <span>
-              <strong>Modo Consulta:</strong> Puedes leer y copiar tus notas rápidas asignadas. Solo el administrador puede crear o modificar notas.
+              <strong>Modo Consulta:</strong> Puedes leer y copiar tus claves asignadas. Solo el administrador puede crear o modificar claves.
             </span>
           </div>
         )}
@@ -382,7 +382,7 @@ export const PasswordsView: React.FC<PasswordsViewProps> = ({
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Buscar notas por título o texto..."
+              placeholder="Buscar claves por título o texto..."
               className="w-full pl-9 pr-4 py-2 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 outline-none focus:ring-2 focus:ring-amber-500/30"
             />
             {searchTerm && (
@@ -478,15 +478,15 @@ export const PasswordsView: React.FC<PasswordsViewProps> = ({
           <div>
             <h3 className="text-base font-black text-slate-900 dark:text-white">
               {searchTerm || selectedColorFilter !== 'all' || selectedMemberFilter !== 'all'
-                ? 'No se encontraron notas con estos filtros'
-                : 'No hay notas registradas'}
+                ? 'No se encontraron claves con estos filtros'
+                : 'No hay claves registradas'}
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
               {searchTerm || selectedColorFilter !== 'all' || selectedMemberFilter !== 'all'
                 ? 'Intenta restablecer la búsqueda o cambiar los filtros.'
                 : isAdmin
-                ? 'Crea tu primera nota adhesiva con escritura libre y asígnala al familiar deseado.'
-                : 'Aún no tienes notas asignadas por el administrador.'}
+                ? 'Crea tu primera clave con escritura libre y asígnala al familiar deseado.'
+                : 'Aún no tienes claves asignadas por el administrador.'}
             </p>
           </div>
           {isAdmin && (
@@ -495,7 +495,7 @@ export const PasswordsView: React.FC<PasswordsViewProps> = ({
               className="px-4 py-2 rounded-2xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-xs border border-amber-600"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Crear Primera Nota</span>
+              <span>Crear Primera Clave</span>
             </button>
           )}
         </div>
@@ -561,7 +561,7 @@ export const PasswordsView: React.FC<PasswordsViewProps> = ({
                   type="text"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  placeholder="Título de la nota (ej. Clave WiFi, Instrucciones...)"
+                  placeholder="Título de la clave (ej. Clave WiFi, Instrucciones...)"
                   className="w-full px-3 py-2 text-sm sm:text-base font-black bg-white/60 dark:bg-black/30 border border-black/10 dark:border-white/10 rounded-xl placeholder-slate-500/70 outline-none focus:ring-2 focus:ring-amber-500/40"
                   onKeyDown={(e) => {
                     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
@@ -577,7 +577,7 @@ export const PasswordsView: React.FC<PasswordsViewProps> = ({
                   rows={4}
                   value={newNotes}
                   onChange={(e) => setNewNotes(e.target.value)}
-                  placeholder="Escribe libremente aquí tu nota, recordatorio, instrucciones o claves..."
+                  placeholder="Escribe libremente aquí tu clave, recordatorio, instrucciones o códigos de acceso..."
                   className="w-full px-3 py-2.5 text-xs sm:text-sm bg-white/60 dark:bg-black/30 border border-black/10 dark:border-white/10 rounded-xl placeholder-slate-500/70 outline-none focus:ring-2 focus:ring-amber-500/40 resize-none font-sans leading-relaxed"
                   onKeyDown={(e) => {
                     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
@@ -605,7 +605,7 @@ export const PasswordsView: React.FC<PasswordsViewProps> = ({
                 className="px-4 py-1.5 rounded-xl text-xs font-black bg-slate-950 text-white dark:bg-white dark:text-slate-950 transition-all cursor-pointer flex items-center gap-1.5 shadow-sm hover:scale-105 disabled:opacity-40"
               >
                 <Save className="w-3.5 h-3.5" />
-                <span>Guardar Nota</span>
+                <span>Guardar Clave</span>
               </button>
             </div>
           </div>
@@ -676,7 +676,7 @@ export const PasswordsView: React.FC<PasswordsViewProps> = ({
                       type="text"
                       value={editTitle}
                       onChange={(e) => setEditTitle(e.target.value)}
-                      placeholder="Título de la nota..."
+                      placeholder="Título de la clave..."
                       className="w-full px-3 py-2 text-sm sm:text-base font-black bg-white/60 dark:bg-black/30 border border-black/10 dark:border-white/10 rounded-xl placeholder-slate-500/70 outline-none focus:ring-2 focus:ring-amber-500/40"
                       onKeyDown={(e) => {
                         if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
@@ -692,7 +692,7 @@ export const PasswordsView: React.FC<PasswordsViewProps> = ({
                       rows={4}
                       value={editNotes}
                       onChange={(e) => setEditNotes(e.target.value)}
-                      placeholder="Escribe aquí tu nota..."
+                      placeholder="Escribe aquí tu clave o recordatorio..."
                       className="w-full px-3 py-2.5 text-xs sm:text-sm bg-white/60 dark:bg-black/30 border border-black/10 dark:border-white/10 rounded-xl placeholder-slate-500/70 outline-none focus:ring-2 focus:ring-amber-500/40 resize-none font-sans leading-relaxed"
                       onKeyDown={(e) => {
                         if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
@@ -790,11 +790,11 @@ export const PasswordsView: React.FC<PasswordsViewProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    const full = `${item.website ? `📌 ${item.website}\n\n` : ''}${item.notes || ''}`.trim();
+                    const full = `${item.website ? `🔑 ${item.website}\n\n` : ''}${item.notes || ''}`.trim();
                     handleCopy(full, `note_${item.id}`);
                   }}
                   className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer bg-white/40 dark:bg-black/20 ${theme.actionHover}`}
-                  title="Copiar texto de la nota"
+                  title="Copiar clave"
                 >
                   {isCopiedNote ? (
                     <>
@@ -827,7 +827,7 @@ export const PasswordsView: React.FC<PasswordsViewProps> = ({
                       type="button"
                       onClick={() => handleStartEdit(item)}
                       className="p-1.5 rounded-xl hover:bg-black/10 dark:hover:bg-white/10 opacity-75 hover:opacity-100 transition-colors cursor-pointer"
-                      title="Editar nota in-line"
+                      title="Editar clave in-line"
                     >
                       <Edit2 className="w-4 h-4" />
                     </button>
@@ -838,12 +838,12 @@ export const PasswordsView: React.FC<PasswordsViewProps> = ({
                     <button
                       type="button"
                       onClick={() => {
-                        if (window.confirm(`¿Seguro que deseas eliminar la nota "${item.website}"?`)) {
+                        if (window.confirm(`¿Seguro que deseas eliminar la clave "${item.website}"?`)) {
                           onDeletePassword(item.id);
                         }
                       }}
                       className="p-1.5 rounded-xl hover:bg-red-500/20 text-red-700 dark:text-red-400 transition-colors cursor-pointer"
-                      title="Eliminar nota"
+                      title="Eliminar clave"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>

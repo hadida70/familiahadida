@@ -830,12 +830,12 @@ async function startServer() {
     const { website, title, email, password, notes, category, memberId, color } = req.body;
     const resolvedTitle = (website || title || '').trim();
     if (!resolvedTitle && !(notes && notes.trim())) {
-      return res.status(400).json({ error: 'El título o contenido de la nota es obligatorio.' });
+      return res.status(400).json({ error: 'El título o contenido de la clave es obligatorio.' });
     }
 
     const newPassword: PasswordItem = {
       id: 'pwd_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
-      website: resolvedTitle || 'Nota Rápida',
+      website: resolvedTitle || 'Clave',
       email: email ? email.trim() : '',
       password: password ? password.trim() : '',
       notes: notes ? notes.trim() : '',
@@ -851,8 +851,8 @@ async function startServer() {
     const notif: PushNotification = {
       id: 'notif_' + Date.now(),
       recipientId: newPassword.memberId || 'all',
-      title: '📌 Nueva Nota Adhesiva / Clave',
-      message: `Se registró nota: "${newPassword.website}"`,
+      title: '🔑 Nueva Clave',
+      message: `Se registró la clave: "${newPassword.website}"`,
       timestamp: new Date().toISOString(),
       read: false,
       type: 'password_added',
@@ -870,7 +870,7 @@ async function startServer() {
     const { id } = req.params;
     const updated = updatePassword(id, req.body);
     if (!updated) {
-      return res.status(404).json({ error: 'Nota / Contraseña no encontrada' });
+      return res.status(404).json({ error: 'Clave no encontrada' });
     }
 
     broadcast('PASSWORD_UPDATED', { password: updated });
@@ -882,7 +882,7 @@ async function startServer() {
     const { id } = req.params;
     const success = deletePassword(id);
     if (!success) {
-      return res.status(404).json({ error: 'Nota / Contraseña no encontrada' });
+      return res.status(404).json({ error: 'Clave no encontrada' });
     }
 
     broadcast('PASSWORD_DELETED', { passwordId: id });

@@ -313,7 +313,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
 
   // Note WhatsApp share helper
   const handleShareNoteWhatsApp = (item: PasswordItem) => {
-    let text = `📌 *${item.website || 'NOTA RÁPIDA'}*\n\n` +
+    let text = `🔑 *${item.website || 'CLAVE'}*\n\n` +
       `${item.notes || ''}\n`;
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text.trim())}`, '_blank');
   };
@@ -326,7 +326,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
     if (!trimmedTitle && !trimmedText) return;
 
     onAddPassword({
-      website: trimmedTitle || (trimmedText ? trimmedText.slice(0, 30) : 'Nota Rápida'),
+      website: trimmedTitle || (trimmedText ? trimmedText.slice(0, 30) : 'Clave'),
       notes: trimmedText,
       memberId: newNoteMemberId || (selectedMemberId !== 'all' ? selectedMemberId : 'all'),
       color: newNoteColor || 'yellow',
@@ -347,7 +347,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
     if (!trimmedTitle && !trimmedText) return;
 
     onUpdatePassword(id, {
-      website: trimmedTitle || 'Nota Rápida',
+      website: trimmedTitle || 'Clave',
       notes: trimmedText,
       memberId: editNoteMemberId || 'all',
       color: editNoteColor || 'yellow',
@@ -435,7 +435,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
                   className="w-full py-2 px-3 rounded-2xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black flex items-center justify-center gap-1.5 shadow-2xs border border-amber-600 cursor-pointer transition-all active:scale-98"
                 >
                   <StickyNote className="w-3.5 h-3.5 stroke-[2.5]" />
-                  <span>+ NUEVA NOTA RÁPIDA</span>
+                  <span>+ NUEVA CLAVE</span>
                 </button>
               )}
             </div>
@@ -598,7 +598,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
               </span>
             </button>
 
-            {/* 📌 Notas Rápidas y Claves (Sticky Notes) */}
+            {/* 🔑 Claves (Sticky Notes) */}
             <button
               type="button"
               onClick={() => {
@@ -613,7 +613,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
             >
               <div className="flex items-center gap-2 truncate">
                 <StickyNote className="w-3.5 h-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
-                <span>Notas y Claves</span>
+                <span>Claves</span>
               </div>
               <span className={`text-[11px] px-2 py-0.5 rounded-full font-black ${
                 selectedCategory === 'notas_claves'
@@ -778,7 +778,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
             )}
             {selectedCategory !== 'all' && (
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold border border-slate-200 dark:border-slate-700 shrink-0">
-                {selectedCategory === 'notas_claves' ? '📌 Notas y Claves' : `📁 ${selectedCategory}`}
+                {selectedCategory === 'notas_claves' ? '🔑 Claves' : `📁 ${selectedCategory}`}
                 <button
                   type="button"
                   onClick={() => setSelectedCategory('all')}
@@ -872,7 +872,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
                 )}
                 {selectedCategory !== 'all' && (
                   <span className="px-2.5 py-0.5 rounded-full bg-white dark:bg-slate-900 text-red-600 font-black border border-red-200 shadow-2xs flex items-center gap-1">
-                    📁 {selectedCategory === 'notas_claves' ? 'Notas y Claves' : selectedCategory}
+                    📁 {selectedCategory === 'notas_claves' ? 'Claves' : selectedCategory}
                     <button
                       type="button"
                       onClick={() => setSelectedCategory('all')}
@@ -925,7 +925,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
             </div>
           )}
 
-          {/* ================= 📌 NOTAS RÁPIDAS Y CLAVES POST-IT GROUP ================= */}
+          {/* ================= 🔑 CLAVES POST-IT GROUP ================= */}
           {showNotesGroup && (
             <div className="bg-white dark:bg-slate-900 rounded-3xl border border-amber-200 dark:border-amber-900/60 shadow-2xs overflow-hidden transition-all">
               {/* Notas Category Header */}
@@ -940,10 +940,10 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white truncate">
-                        Notas Rápidas y Claves
+                        Claves
                       </h3>
                       <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-black bg-amber-200/90 dark:bg-amber-900 text-amber-950 dark:text-amber-200 border border-amber-300 dark:border-amber-800">
-                        {filteredNotes.length} {filteredNotes.length === 1 ? 'nota' : 'notas'}
+                        {filteredNotes.length} {filteredNotes.length === 1 ? 'clave' : 'claves'}
                       </span>
                     </div>
                   </div>
@@ -964,10 +964,10 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
                         setCollapsedCategories((prev) => ({ ...prev, notas_claves: false }));
                       }}
                       className="px-2.5 py-1 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black flex items-center gap-1 shadow-2xs transition-all cursor-pointer border border-amber-600"
-                      title="Agregar nueva nota adhesiva"
+                      title="Agregar nueva clave"
                     >
                       <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                      <span className="hidden sm:inline">Nueva Nota</span>
+                      <span className="hidden sm:inline">Nueva Clave</span>
                     </button>
                   )}
 
@@ -1039,7 +1039,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
                             type="text"
                             value={newNoteTitle}
                             onChange={(e) => setNewNoteTitle(e.target.value)}
-                            placeholder="Título de la nota..."
+                            placeholder="Título de la clave..."
                             className="w-full px-2.5 py-1.5 text-xs sm:text-sm font-black bg-white/60 dark:bg-black/30 border border-black/10 dark:border-white/10 rounded-xl placeholder-slate-500/70 outline-none"
                             onKeyDown={(e) => {
                               if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
@@ -1052,7 +1052,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
                             rows={3}
                             value={newNoteText}
                             onChange={(e) => setNewNoteText(e.target.value)}
-                            placeholder="Escribe aquí tu nota..."
+                            placeholder="Escribe aquí tu clave..."
                             className="w-full px-2.5 py-1.5 text-xs bg-white/60 dark:bg-black/30 border border-black/10 dark:border-white/10 rounded-xl placeholder-slate-500/70 outline-none resize-none"
                             onKeyDown={(e) => {
                               if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
@@ -1137,7 +1137,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
                                 type="text"
                                 value={editNoteTitle}
                                 onChange={(e) => setEditNoteTitle(e.target.value)}
-                                placeholder="Título de la nota..."
+                                placeholder="Título de la clave..."
                                 className="w-full px-2.5 py-1.5 text-xs sm:text-sm font-black bg-white/60 dark:bg-black/30 border border-black/10 dark:border-white/10 rounded-xl outline-none"
                               />
 
@@ -1145,7 +1145,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
                                 rows={3}
                                 value={editNoteText}
                                 onChange={(e) => setEditNoteText(e.target.value)}
-                                placeholder="Escribe aquí tu nota..."
+                                placeholder="Escribe aquí tu clave..."
                                 className="w-full px-2.5 py-1.5 text-xs bg-white/60 dark:bg-black/30 border border-black/10 dark:border-white/10 rounded-xl outline-none resize-none"
                               />
                             </div>
@@ -1223,11 +1223,11 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
                             <button
                               type="button"
                               onClick={() => {
-                                const full = `${note.website ? `📌 ${note.website}\n\n` : ''}${note.notes || ''}`.trim();
+                                const full = `${note.website ? `🔑 ${note.website}\n\n` : ''}${note.notes || ''}`.trim();
                                 handleCopyNote(full, `datos_note_${note.id}`);
                               }}
                               className={`px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer bg-white/40 dark:bg-black/20 ${theme.actionHover}`}
-                              title="Copiar texto de la nota"
+                              title="Copiar clave"
                             >
                               {isCopied ? (
                                 <>
@@ -1264,7 +1264,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
                                     setIsCreatingNote(false);
                                   }}
                                   className="p-1 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 opacity-75 hover:opacity-100 transition-colors cursor-pointer"
-                                  title="Editar nota"
+                                  title="Editar clave"
                                 >
                                   <Edit2 className="w-3.5 h-3.5" />
                                 </button>
@@ -1274,12 +1274,12 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    if (window.confirm(`¿Seguro que deseas eliminar la nota "${note.website}"?`)) {
+                                    if (window.confirm(`¿Seguro que deseas eliminar la clave "${note.website}"?`)) {
                                       onDeletePassword(note.id);
                                     }
                                   }}
                                   className="p-1 rounded-lg hover:bg-red-500/20 text-red-700 dark:text-red-400 transition-colors cursor-pointer"
-                                  title="Eliminar nota"
+                                  title="Eliminar clave"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>

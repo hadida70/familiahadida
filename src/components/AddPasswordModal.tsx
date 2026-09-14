@@ -133,7 +133,7 @@ export const AddPasswordModal: React.FC<AddPasswordModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const finalTitle = website.trim() || (notes.trim() ? notes.trim().slice(0, 30) : 'Nota Rápida');
+    const finalTitle = website.trim() || (notes.trim() ? notes.trim().slice(0, 30) : 'Clave');
     if (!finalTitle && !notes.trim()) return;
 
     onSave({
@@ -171,7 +171,7 @@ export const AddPasswordModal: React.FC<AddPasswordModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-black text-slate-900 dark:text-white">
-                {editingPassword ? 'Editar Nota Adhesiva / Clave' : 'Nueva Nota Rápida (Post-It)'}
+                {editingPassword ? 'Editar Clave' : 'Nueva Clave'}
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Escribe libremente accesos, recordatorios y asigna al propietario
@@ -192,7 +192,7 @@ export const AddPasswordModal: React.FC<AddPasswordModalProps> = ({
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1.5">
               <Palette className="w-3.5 h-3.5 text-amber-500" />
-              <span>Color de la Nota Adhesiva:</span>
+              <span>Color de la Clave:</span>
             </label>
             <div className="flex items-center gap-2.5 flex-wrap">
               {POSTIT_COLORS.map((c) => {
@@ -232,7 +232,7 @@ export const AddPasswordModal: React.FC<AddPasswordModalProps> = ({
               onChange={(e) => setMemberId(e.target.value)}
               className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs sm:text-sm font-medium outline-none focus:ring-2 focus:ring-amber-500/30 cursor-pointer"
             >
-              <option value="all">👥 Toda la Familia (Nota Compartida)</option>
+              <option value="all">👥 Toda la Familia (Clave Compartida)</option>
               {members.map((m) => (
                 <option key={m.id} value={m.id}>
                   👤 {m.name} {m.role === 'admin' ? '(Admin)' : ''}
@@ -240,7 +240,7 @@ export const AddPasswordModal: React.FC<AddPasswordModalProps> = ({
               ))}
             </select>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-              * El familiar seleccionado solo podrá ver esta nota en modo lectura.
+              * El familiar seleccionado solo podrá ver esta clave en modo lectura.
             </p>
           </div>
 
@@ -260,17 +260,17 @@ export const AddPasswordModal: React.FC<AddPasswordModalProps> = ({
             />
           </div>
 
-          {/* 4. Contenido / Nota Libre (Área principal del Post-It) */}
+          {/* 4. Contenido / Clave Libre (Área principal del Post-It) */}
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
               <FileText className="w-3.5 h-3.5 text-amber-500" />
-              <span>Texto / Contenido Libre de la Nota:</span>
+              <span>Texto / Contenido Libre de la Clave:</span>
             </label>
             <textarea
               rows={4}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Escribe libremente aquí cualquier nota rápida, instrucciones, códigos de acceso, preguntas secretas, detalles de la cuenta o claves..."
+              placeholder="Escribe libremente aquí tu clave, instrucciones, códigos de acceso, preguntas secretas o detalles de la cuenta..."
               className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs sm:text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/30 resize-none font-sans leading-relaxed"
             />
           </div>
@@ -391,7 +391,7 @@ export const AddPasswordModal: React.FC<AddPasswordModalProps> = ({
               className="px-5 py-2.5 rounded-2xl text-xs font-extrabold bg-amber-500 hover:bg-amber-600 text-slate-950 border border-amber-600 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm hover:shadow-md disabled:opacity-40"
             >
               <StickyNote className="w-4 h-4 text-slate-950" />
-              <span>{editingPassword ? 'Guardar Nota' : 'Fijar Nota Adhesiva'}</span>
+              <span>{editingPassword ? 'Guardar Clave' : 'Fijar Clave'}</span>
             </button>
           </div>
         </form>

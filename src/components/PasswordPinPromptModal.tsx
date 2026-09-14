@@ -18,8 +18,8 @@ export const PasswordPinPromptModal: React.FC<PasswordPinPromptModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
-  title = 'Acceso a Contraseñas',
-  subtitle = 'Introduce el PIN de seguridad (1474) para ver y gestionar las contraseñas.',
+  title = 'Acceso a Claves',
+  subtitle = 'Introduce el PIN de seguridad (1474) para ver y gestionar las claves.',
   activeMember,
   onLogin,
 }) => {
