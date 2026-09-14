@@ -745,34 +745,72 @@ export function useWebSocket(): UseWebSocketReturn {
 
   const addPersonalRecord = async (record: Partial<PersonalRecord>) => {
     try {
-      await fetch('/api/personal-records', {
+      const res = await fetch('/api/personal-records', {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(record),
       });
+
+      if (res.ok) {
+        const newRecord: PersonalRecord = await res.json();
+        setData((prev) => ({
+          ...prev,
+          personalRecords: [
+            newRecord,
+            ...(prev.personalRecords || []).filter((r) => r.id !== newRecord.id),
+          ],
+        }));
+        sounds.playAddSound();
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        console.error('Error adding personal record server response:', errJson);
+        alert(errJson.error || 'Error al guardar el dato personal.');
+      }
     } catch (err) {
       console.error('Error adding personal record:', err);
+      alert('Error de red al conectar con el servidor.');
     }
   };
 
   const updatePersonalRecord = async (id: string, updates: Partial<PersonalRecord>) => {
     try {
-      await fetch(`/api/personal-records/${id}`, {
+      const res = await fetch(`/api/personal-records/${id}`, {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify(updates),
       });
+
+      if (res.ok) {
+        const updated: PersonalRecord = await res.json();
+        setData((prev) => ({
+          ...prev,
+          personalRecords: (prev.personalRecords || []).map((r) => (r.id === id ? updated : r)),
+        }));
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        console.error('Error updating personal record server response:', errJson);
+        alert(errJson.error || 'Error al actualizar el dato personal.');
+      }
     } catch (err) {
       console.error('Error updating personal record:', err);
     }
   };
 
   const deletePersonalRecord = async (id: string) => {
+    setData((prev) => ({
+      ...prev,
+      personalRecords: (prev.personalRecords || []).filter((r) => r.id !== id),
+    }));
+
     try {
-      await fetch(`/api/personal-records/${id}`, {
+      const res = await fetch(`/api/personal-records/${id}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
       });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        console.error('Error deleting personal record server response:', errJson);
+      }
     } catch (err) {
       console.error('Error deleting personal record:', err);
     }

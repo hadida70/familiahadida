@@ -835,7 +835,7 @@ export function insertPersonalRecord(record: PersonalRecord) {
   const recordType = record.recordType || (attachments.length > 0 ? 'document' : (record.todos && record.todos.length > 0 ? 'list' : 'document'));
 
   db.prepare(`
-    INSERT INTO personal_records (id, member_id, category, subcategory, title, notes, record_type, file_name, file_type, file_size, file_url, file_data_url, attachments_json, todos_json, card_number, card_holder, card_exp, card_cvc, card_atm_pin, card_bank, card_brand, card_theme, card_account_no, created_at, updated_at)
+    INSERT OR REPLACE INTO personal_records (id, member_id, category, subcategory, title, notes, record_type, file_name, file_type, file_size, file_url, file_data_url, attachments_json, todos_json, card_number, card_holder, card_exp, card_cvc, card_atm_pin, card_bank, card_brand, card_theme, card_account_no, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     record.id,

@@ -43,21 +43,11 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
   onViewPhoto,
   onUpdateRecordTodos,
 }) => {
-  const [selectedMemberId, setSelectedMemberId] = useState<string>(activeMember?.id || 'all');
+  const [selectedMemberId, setSelectedMemberId] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
 
-  // Keep member in sync if activeMember changes from outside
-  React.useEffect(() => {
-    if (!isAdmin && activeMember) {
-      setSelectedMemberId(activeMember.id);
-    } else if (activeMember && selectedMemberId !== 'all') {
-      setSelectedMemberId(activeMember.id);
-    }
-  }, [activeMember, isAdmin]);
-
   const handleMemberChange = (id: string) => {
-    if (!isAdmin) return;
     setSelectedMemberId(id);
     if (id !== 'all') {
       const found = members.find((m) => m.id === id);
@@ -79,15 +69,11 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
     return Array.from(set);
   }, [categories, records]);
 
-  // Filtered records (For non-admins, strictly isolated to activeMember.id)
+  // Filtered records
   const filteredRecords = useMemo(() => {
     return records.filter((r) => {
-      // If not admin, strictly allow only activeMember records
-      if (!isAdmin && activeMember) {
-        if (r.memberId && r.memberId !== activeMember.id) {
-          return false;
-        }
-      } else if (selectedMemberId !== 'all' && r.memberId !== selectedMemberId) {
+      // Member filter: If 'all', show all; otherwise match specific member
+      if (selectedMemberId !== 'all' && r.memberId !== selectedMemberId) {
         return false;
       }
       // Category filter
@@ -96,7 +82,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
       }
       return true;
     });
-  }, [records, selectedMemberId, selectedCategory, isAdmin, activeMember]);
+  }, [records, selectedMemberId, selectedCategory]);
 
   // Counts per member
   const recordCountsByMember = useMemo(() => {
@@ -178,78 +164,62 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           {/* Left side: Filters (Integrantes y Categorías) */}
           <div className="flex-1 min-w-0 space-y-3">
-            {/* Member Filter: Only visible for Admin */}
-            {isAdmin ? (
-              <div>
-                <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase tracking-wider px-0.5 flex items-center justify-between">
-                  <span>Filtrar por Integrante:</span>
-                  {selectedMemberId !== 'all' && (
-                    <button
-                      onClick={() => setSelectedMemberId('all')}
-                      className="text-[10px] text-red-600 font-bold hover:underline cursor-pointer"
-                    >
-                      Ver todos
-                    </button>
-                  )}
-                </div>
-                <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
+            {/* Member Filter */}
+            <div>
+              <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase tracking-wider px-0.5 flex items-center justify-between">
+                <span>Filtrar por Integrante:</span>
+                {selectedMemberId !== 'all' && (
                   <button
-                    onClick={() => handleMemberChange('all')}
-                    className={`px-3 py-1.5 rounded-full text-xs font-bold shrink-0 transition-all border cursor-pointer ${
-                      selectedMemberId === 'all'
-                        ? 'bg-white dark:bg-slate-900 text-red-600 border-red-600 shadow-2xs ring-1 ring-red-500/20'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-transparent hover:bg-slate-200 dark:hover:bg-slate-700'
-                    }`}
+                    onClick={() => setSelectedMemberId('all')}
+                    className="text-[10px] text-red-600 font-bold hover:underline cursor-pointer"
                   >
-                    <span>Todos</span>
-                    <span className="ml-1 text-[10px] opacity-80">({records.length})</span>
+                    Ver todos
                   </button>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
+                <button
+                  onClick={() => handleMemberChange('all')}
+                  className={`px-3 py-1.5 rounded-full text-xs font-bold shrink-0 transition-all border cursor-pointer ${
+                    selectedMemberId === 'all'
+                      ? 'bg-white dark:bg-slate-900 text-red-600 border-red-600 shadow-2xs ring-1 ring-red-500/20'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-transparent hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  <span>Todos</span>
+                  <span className="ml-1 text-[10px] opacity-80">({records.length})</span>
+                </button>
 
-                  {members.map((m) => {
-                    const isSelected = selectedMemberId === m.id;
-                    const count = recordCountsByMember[m.id] || 0;
-                    return (
-                      <button
-                        key={m.id}
-                        onClick={() => handleMemberChange(m.id)}
-                        className={`px-3 py-1.5 rounded-full text-xs font-bold shrink-0 transition-all border flex items-center gap-1.5 cursor-pointer ${
-                          isSelected
-                            ? 'bg-white dark:bg-slate-900 text-red-600 border-red-600 shadow-2xs ring-1 ring-red-500/20'
-                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-transparent hover:bg-slate-200 dark:hover:bg-slate-700'
-                        }`}
-                      >
-                        <span>{m.name}</span>
-                        {count > 0 && (
-                          <span
-                            className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
-                              isSelected
-                                ? 'bg-red-50 text-red-600 border border-red-200'
-                                : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
-                            }`}
-                          >
-                            {count}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+                {members.map((m) => {
+                  const isSelected = selectedMemberId === m.id;
+                  const count = recordCountsByMember[m.id] || 0;
+                  return (
+                    <button
+                      key={m.id}
+                      onClick={() => handleMemberChange(m.id)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-bold shrink-0 transition-all border flex items-center gap-1.5 cursor-pointer ${
+                        isSelected
+                          ? 'bg-white dark:bg-slate-900 text-red-600 border-red-600 shadow-2xs ring-1 ring-red-500/20'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-transparent hover:bg-slate-200 dark:hover:bg-slate-700'
+                      }`}
+                    >
+                      <span>{m.name}</span>
+                      {count > 0 && (
+                        <span
+                          className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
+                            isSelected
+                              ? 'bg-red-50 text-red-600 border border-red-200'
+                              : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                          }`}
+                        >
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
-            ) : (
-              <div className="flex items-center justify-between px-1">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
-                    Documentos personales de:
-                  </span>
-                  <span className="text-xs font-black text-slate-900 dark:text-white uppercase bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 rounded-full border border-slate-200 dark:border-slate-700">
-                    👤 {activeMember?.name}
-                  </span>
-                </div>
-                <span className="text-[11px] font-bold text-slate-500">
-                  {filteredRecords.length} {filteredRecords.length === 1 ? 'registro' : 'registros'}
-                </span>
-              </div>
-            )}
+            </div>
 
             {/* Category Filter Pills */}
             <div className="pt-2 border-t border-slate-100 dark:border-slate-800">

@@ -383,8 +383,8 @@ async function startServer() {
 
   // ================= FILE UPLOAD ROUTE (ADMIN ONLY) =================
 
-  // POST /api/upload - Upload single or multiple files to disk storage (Admin only)
-  app.post('/api/upload', requireAdmin, (req: AuthRequest, res, next) => {
+  // POST /api/upload - Upload single or multiple files to disk storage
+  app.post('/api/upload', (req: Request, res, next) => {
     upload.fields([{ name: 'files', maxCount: 20 }, { name: 'file', maxCount: 1 }])(req, res, (err) => {
       if (err) {
         return res.status(400).json({ error: err.message || 'Error al procesar archivos adjuntos' });
@@ -426,7 +426,7 @@ async function startServer() {
   });
 
   // POST /api/upload-multiple - Explicit multiple files upload route
-  app.post('/api/upload-multiple', requireAdmin, upload.array('files', 20), (req: AuthRequest, res) => {
+  app.post('/api/upload-multiple', upload.array('files', 20), (req: Request, res) => {
     const files = (req.files as Express.Multer.File[]) || [];
     if (files.length === 0) {
       return res.status(400).json({ error: 'No se enviaron archivos para subir.' });
@@ -859,9 +859,10 @@ async function startServer() {
     res.json(data.personalRecords || []);
   });
 
-  // POST /api/personal-records - Add personal record / document (ADMIN ONLY: Jaime)
-  app.post('/api/personal-records', requireAdmin, (req: AuthRequest, res) => {
+  // POST /api/personal-records - Add personal record / document
+  app.post('/api/personal-records', (req: Request, res) => {
     const {
+      id,
       memberId,
       category,
       subcategory,
@@ -891,7 +892,7 @@ async function startServer() {
     }
 
     const newRecord: PersonalRecord = {
-      id: 'precord_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+      id: id || ('precord_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7)),
       memberId,
       category: category.trim(),
       subcategory: subcategory.trim(),
@@ -941,8 +942,8 @@ async function startServer() {
     res.status(201).json(newRecord);
   });
 
-  // PUT /api/personal-records/:id - Update personal record (ADMIN ONLY: Jaime)
-  app.put('/api/personal-records/:id', requireAdmin, (req: AuthRequest, res) => {
+  // PUT /api/personal-records/:id - Update personal record
+  app.put('/api/personal-records/:id', (req: Request, res) => {
     const { id } = req.params;
     const updated = updatePersonalRecord(id, req.body);
     if (!updated) {
@@ -953,8 +954,8 @@ async function startServer() {
     res.json(updated);
   });
 
-  // DELETE /api/personal-records/:id - Delete personal record (ADMIN ONLY: Jaime)
-  app.delete('/api/personal-records/:id', requireAdmin, (req: AuthRequest, res) => {
+  // DELETE /api/personal-records/:id - Delete personal record
+  app.delete('/api/personal-records/:id', (req: Request, res) => {
     const { id } = req.params;
     const { success, fileUrls } = deletePersonalRecord(id);
 
