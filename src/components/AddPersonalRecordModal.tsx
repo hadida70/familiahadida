@@ -76,18 +76,6 @@ export const isCardSubcategory = (cat: string, sub: string, rec?: PersonalRecord
   );
 };
 
-// Preset labels for common document sides / types
-const QUICK_LABEL_PRESETS = [
-  'Frente',
-  'Dorso',
-  'Sefaj / Anexo',
-  'Página 1',
-  'Página 2',
-  'Comprobante',
-  'Contrato',
-  'Pasaporte',
-];
-
 // Quick To-Do / List Item suggestions
 const QUICK_TODO_PRESETS = [
   'Pedir turno',
@@ -373,25 +361,12 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
           const reader = new FileReader();
           reader.onload = (e) => {
             const dataUrl = (e.target?.result as string) || '';
-            // Auto-assign logical default label if multiple are added
-            let defaultLabel = '';
-            if (attachments.length === 0 && fileArray.length === 2) {
-              defaultLabel = i === 0 ? 'Frente' : 'Dorso';
-            } else if (attachments.length === 0 && fileArray.length === 1) {
-              defaultLabel = 'Frente';
-            } else if (attachments.length === 1 && fileArray.length === 1) {
-              defaultLabel = 'Dorso';
-            } else if (attachments.length >= 2) {
-              defaultLabel = `Anexo ${attachments.length + i + 1}`;
-            }
-
             resolve({
-              id: 'att_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+              id: 'att_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7) + '_' + i,
               fileName: file.name,
               fileType: file.type || 'application/octet-stream',
               fileSize: file.size,
               fileDataUrl: dataUrl,
-              label: defaultLabel,
               createdAt: new Date().toISOString(),
             });
           };
@@ -468,12 +443,6 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
 
   const handleRemoveAttachment = (idToRemove: string) => {
     setAttachments((prev) => prev.filter((a) => a.id !== idToRemove));
-  };
-
-  const handleUpdateAttachmentLabel = (id: string, newLabel: string) => {
-    setAttachments((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, label: newLabel } : a))
-    );
   };
 
   const handleMoveAttachment = (index: number, direction: 'up' | 'down') => {
@@ -1080,7 +1049,7 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
                       {isUploading ? 'Subiendo archivos...' : 'Haz clic para seleccionar uno o varios archivos'}
                     </p>
                     <p className="text-[11px] text-slate-400 mt-0.5">
-                      O arrastra y suelta aquí (Frente, Dorso, PDFs, JPG, PNG, etc.)
+                      O arrastra y suelta aquí fotos, PDFs, imágenes o documentos
                     </p>
                   </div>
                 </div>
@@ -1108,12 +1077,11 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
                 </button>
               </div>
 
-              {/* List of Attached Documents with Labels and Controls */}
+              {/* List of Attached Documents and Controls */}
               {attachments.length > 0 && (
                 <div className="space-y-2 pt-1">
                   <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 flex items-center justify-between px-1">
-                    <span>Archivos en esta subcategoría ({attachments.length}):</span>
-                    <span className="text-[10px] text-slate-400">Asigna etiquetas (Frente/Dorso) a cada archivo</span>
+                    <span>Archivos adjuntos ({attachments.length}):</span>
                   </div>
 
                   {attachments.map((att, idx) => {
@@ -1124,9 +1092,9 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
                     return (
                       <div
                         key={att.id || idx}
-                        className="rounded-2xl border border-slate-200 dark:border-slate-700 p-3 bg-slate-50/80 dark:bg-slate-800/60 space-y-2.5 transition-all hover:border-slate-300 dark:hover:border-slate-600"
+                        className="rounded-2xl border border-slate-200 dark:border-slate-700 p-3 bg-slate-50/80 dark:bg-slate-800/60 transition-all hover:border-slate-300 dark:hover:border-slate-600"
                       >
-                        {/* Top row: Thumbnail/Icon + Name + Actions */}
+                        {/* Thumbnail/Icon + Name + Actions */}
                         <div className="flex items-center justify-between gap-3">
                           <div className="flex items-center gap-2.5 min-w-0 flex-1">
                             {/* Thumbnail / Icon */}
@@ -1136,7 +1104,7 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
                                   e.stopPropagation();
                                   if (onPreviewAttachment) onPreviewAttachment(att);
                                 }}
-                                className="w-12 h-12 rounded-xl overflow-hidden bg-slate-200 dark:bg-slate-700 shrink-0 border border-slate-200 dark:border-slate-700 cursor-pointer relative group/preview"
+                                className="w-11 h-11 rounded-xl overflow-hidden bg-slate-200 dark:bg-slate-700 shrink-0 border border-slate-200 dark:border-slate-700 cursor-pointer relative group/preview"
                                 title="Clic para ampliar vista previa"
                               >
                                 <img
@@ -1150,7 +1118,7 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
                                 </div>
                               </div>
                             ) : (
-                              <div className="w-12 h-12 rounded-xl bg-red-50 dark:bg-red-950/40 text-red-600 flex items-center justify-center shrink-0 border border-red-200 dark:border-red-900">
+                              <div className="w-11 h-11 rounded-xl bg-red-50 dark:bg-red-950/40 text-red-600 flex items-center justify-center shrink-0 border border-red-200 dark:border-red-900">
                                 <FileText className="w-5 h-5" />
                               </div>
                             )}
@@ -1171,7 +1139,7 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
                             </div>
                           </div>
 
-                          {/* Top Actions: Move Up / Down / View / Delete */}
+                          {/* Actions: Move Up / Down / View / Delete */}
                           <div className="flex items-center gap-1 shrink-0">
                             {attachments.length > 1 && (
                               <>
@@ -1215,39 +1183,6 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
-                          </div>
-                        </div>
-
-                        {/* Bottom row: Quick label tags selector + custom label input */}
-                        <div className="pt-1.5 border-t border-slate-200/60 dark:border-slate-700/60 flex flex-col sm:flex-row sm:items-center gap-1.5">
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <span className="text-[10px] font-bold text-slate-400 shrink-0">Etiqueta:</span>
-                            <input
-                              type="text"
-                              value={att.label || ''}
-                              onChange={(e) => handleUpdateAttachmentLabel(att.id, e.target.value)}
-                              placeholder="Frente, Dorso..."
-                              className="px-2 py-0.5 rounded-lg text-[11px] font-bold bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white max-w-[130px] focus:outline-hidden focus:border-red-500"
-                            />
-                          </div>
-                          <div className="flex items-center gap-1 overflow-x-auto scrollbar-none flex-1">
-                            {QUICK_LABEL_PRESETS.map((preset) => {
-                              const isSelected = att.label === preset;
-                              return (
-                                <button
-                                  key={preset}
-                                  type="button"
-                                  onClick={() => handleUpdateAttachmentLabel(att.id, isSelected ? '' : preset)}
-                                  className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer border shrink-0 ${
-                                    isSelected
-                                      ? 'bg-red-600 text-white border-red-600 shadow-2xs'
-                                      : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300'
-                                  }`}
-                                >
-                                  {preset}
-                                </button>
-                              );
-                            })}
                           </div>
                         </div>
                       </div>

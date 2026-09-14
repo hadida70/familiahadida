@@ -251,9 +251,11 @@ export const PersonalRecordCard: React.FC<PersonalRecordCardProps> = ({
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
                       <Eye className="w-4 h-4 text-white" />
                     </div>
-                    <div className="absolute bottom-1.5 left-1.5 px-2 py-0.5 rounded-lg bg-red-600 text-white text-[9px] font-black shadow-md">
-                      {imgAtt.label || (i === 0 ? 'Frente' : 'Dorso')}
-                    </div>
+                    {imgAtt.label && (
+                      <div className="absolute bottom-1.5 left-1.5 px-2 py-0.5 rounded-lg bg-red-600 text-white text-[9px] font-black shadow-md">
+                        {imgAtt.label}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
