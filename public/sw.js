@@ -1,4 +1,4 @@
-const CACHE_NAME = 'familiahadida-pwa-v10';
+const CACHE_NAME = 'familiahadida-pwa-v11';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

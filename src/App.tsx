@@ -531,7 +531,7 @@ export default function App() {
       />
 
       {/* Main Container */}
-      <main className="max-w-5xl mx-auto px-4 w-full flex-1 mt-4">
+      <main className={`mx-auto px-2 sm:px-4 w-full flex-1 mt-4 ${activeTab === 'personal_data' ? 'max-w-7xl' : 'max-w-5xl'}`}>
         {activeTab === 'calendar' ? (
           /* CALENDARIO MENSUAL CON OPCIÓN A COLOCAR TAREAS */
           <MonthlyCalendarView
