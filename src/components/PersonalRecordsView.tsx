@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Plus,
   Send,
@@ -6,12 +6,26 @@ import {
   FolderOpen,
   ChevronDown,
   ChevronUp,
+  StickyNote,
+  Copy,
+  Check,
+  Edit2,
+  Trash2,
+  ExternalLink,
+  Share2,
+  User,
+  Users,
+  X,
+  Save,
+  Palette,
 } from 'lucide-react';
-import { Member, PersonalRecord, DataCategory } from '../types';
+import { Member, PersonalRecord, DataCategory, PasswordItem } from '../types';
 import { PersonalRecordCard } from './PersonalRecordCard';
+import { sounds } from '../lib/sound';
 
 interface PersonalRecordsViewProps {
   records: PersonalRecord[];
+  passwords?: PasswordItem[];
   members: Member[];
   categories?: DataCategory[];
   activeMember: Member | null;
@@ -26,10 +40,76 @@ interface PersonalRecordsViewProps {
   onDeleteRecord: (id: string) => void;
   onViewPhoto: (record: PersonalRecord, attachmentIndex?: number) => void;
   onUpdateRecordTodos?: (recordId: string, todos: any[]) => void;
+  onAddPassword?: (password: Partial<PasswordItem>) => void;
+  onUpdatePassword?: (id: string, updates: Partial<PasswordItem>) => void;
+  onDeletePassword?: (id: string) => void;
 }
+
+const POSTIT_COLORS = [
+  {
+    id: 'yellow',
+    name: 'Amarillo',
+    card: 'bg-amber-100/95 dark:bg-amber-950/80 border-amber-300/80 dark:border-amber-700/60 text-amber-950 dark:text-amber-100 shadow-md shadow-amber-900/5',
+    tape: 'bg-amber-300/70 dark:bg-amber-600/40 border border-amber-400/40',
+    badge: 'bg-amber-200/90 dark:bg-amber-900/80 text-amber-950 dark:text-amber-200 border-amber-300/80',
+    actionHover: 'hover:bg-amber-200/90 dark:hover:bg-amber-900/70 text-amber-900 dark:text-amber-200',
+    dotClass: 'bg-amber-400 border-amber-500',
+  },
+  {
+    id: 'pink',
+    name: 'Rosa',
+    card: 'bg-pink-100/95 dark:bg-pink-950/80 border-pink-300/80 dark:border-pink-700/60 text-pink-950 dark:text-pink-100 shadow-md shadow-pink-900/5',
+    tape: 'bg-pink-300/70 dark:bg-pink-600/40 border border-pink-400/40',
+    badge: 'bg-pink-200/90 dark:bg-pink-900/80 text-pink-950 dark:text-pink-200 border-pink-300/80',
+    actionHover: 'hover:bg-pink-200/90 dark:hover:bg-pink-900/70 text-pink-900 dark:text-pink-200',
+    dotClass: 'bg-pink-400 border-pink-500',
+  },
+  {
+    id: 'green',
+    name: 'Verde',
+    card: 'bg-emerald-100/95 dark:bg-emerald-950/80 border-emerald-300/80 dark:border-emerald-700/60 text-emerald-950 dark:text-emerald-100 shadow-md shadow-emerald-900/5',
+    tape: 'bg-emerald-300/70 dark:bg-emerald-600/40 border border-emerald-400/40',
+    badge: 'bg-emerald-200/90 dark:bg-emerald-900/80 text-emerald-950 dark:text-emerald-200 border-emerald-300/80',
+    actionHover: 'hover:bg-emerald-200/90 dark:hover:bg-emerald-900/70 text-emerald-900 dark:text-emerald-200',
+    dotClass: 'bg-emerald-400 border-emerald-500',
+  },
+  {
+    id: 'blue',
+    name: 'Azul',
+    card: 'bg-sky-100/95 dark:bg-sky-950/80 border-sky-300/80 dark:border-sky-700/60 text-sky-950 dark:text-sky-100 shadow-md shadow-sky-900/5',
+    tape: 'bg-sky-300/70 dark:bg-sky-600/40 border border-sky-400/40',
+    badge: 'bg-sky-200/90 dark:bg-sky-900/80 text-sky-950 dark:text-sky-200 border-sky-300/80',
+    actionHover: 'hover:bg-sky-200/90 dark:hover:bg-sky-900/70 text-sky-900 dark:text-sky-200',
+    dotClass: 'bg-sky-400 border-sky-500',
+  },
+  {
+    id: 'purple',
+    name: 'Lavanda',
+    card: 'bg-purple-100/95 dark:bg-purple-950/80 border-purple-300/80 dark:border-purple-700/60 text-purple-950 dark:text-purple-100 shadow-md shadow-purple-900/5',
+    tape: 'bg-purple-300/70 dark:bg-purple-600/40 border border-purple-400/40',
+    badge: 'bg-purple-200/90 dark:bg-purple-900/80 text-purple-950 dark:text-purple-200 border-purple-300/80',
+    actionHover: 'hover:bg-purple-200/90 dark:hover:bg-purple-900/70 text-purple-900 dark:text-purple-200',
+    dotClass: 'bg-purple-400 border-purple-500',
+  },
+  {
+    id: 'orange',
+    name: 'Naranja',
+    card: 'bg-orange-100/95 dark:bg-orange-950/80 border-orange-300/80 dark:border-orange-700/60 text-orange-950 dark:text-orange-100 shadow-md shadow-orange-900/5',
+    tape: 'bg-orange-300/70 dark:bg-orange-600/40 border border-orange-400/40',
+    badge: 'bg-orange-200/90 dark:bg-orange-900/80 text-orange-950 dark:text-orange-200 border-orange-300/80',
+    actionHover: 'hover:bg-orange-200/90 dark:hover:bg-orange-900/70 text-orange-900 dark:text-orange-200',
+    dotClass: 'bg-orange-400 border-orange-500',
+  },
+];
+
+const THEMES_MAP = POSTIT_COLORS.reduce((acc, c) => {
+  acc[c.id] = c;
+  return acc;
+}, {} as Record<string, typeof POSTIT_COLORS[0]>);
 
 export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
   records,
+  passwords = [],
   members,
   categories = [],
   activeMember,
@@ -42,10 +122,35 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
   onDeleteRecord,
   onViewPhoto,
   onUpdateRecordTodos,
+  onAddPassword,
+  onUpdatePassword,
+  onDeletePassword,
 }) => {
   const [selectedMemberId, setSelectedMemberId] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
+
+  // In-line note creation & editing state inside Datos
+  const [isCreatingNote, setIsCreatingNote] = useState(false);
+  const [newNoteTitle, setNewNoteTitle] = useState('');
+  const [newNoteText, setNewNoteText] = useState('');
+  const [newNoteMemberId, setNewNoteMemberId] = useState('all');
+  const [newNoteColor, setNewNoteColor] = useState('yellow');
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editNoteTitle, setEditNoteTitle] = useState('');
+  const [editNoteText, setEditNoteText] = useState('');
+  const [editNoteMemberId, setEditNoteMemberId] = useState('all');
+  const [editNoteColor, setEditNoteColor] = useState('yellow');
+  const [copiedNoteId, setCopiedNoteId] = useState<string | null>(null);
+  const noteTitleInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isCreatingNote) {
+      setTimeout(() => {
+        noteTitleInputRef.current?.focus();
+      }, 50);
+    }
+  }, [isCreatingNote]);
 
   const handleMemberChange = (id: string) => {
     setSelectedMemberId(id);
@@ -58,6 +163,24 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
   const handleCategoryChange = (catName: string) => {
     setSelectedCategory(catName);
   };
+
+  // Filtered passwords/notes for the selected member
+  const filteredNotes = useMemo(() => {
+    let baseList = passwords;
+    if (!isAdmin && activeMember) {
+      baseList = passwords.filter(
+        (p) => p.memberId === activeMember.id || p.memberId === 'all' || !p.memberId
+      );
+    }
+
+    if (selectedMemberId !== 'all') {
+      baseList = baseList.filter(
+        (p) => p.memberId === selectedMemberId || p.memberId === 'all'
+      );
+    }
+
+    return baseList;
+  }, [passwords, isAdmin, activeMember, selectedMemberId]);
 
   // Distinct categories from both predefined list and records
   const allCategoryNames = useMemo(() => {
@@ -72,29 +195,46 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
   // Filtered records
   const filteredRecords = useMemo(() => {
     return records.filter((r) => {
-      // Member filter: If 'all', show all; otherwise match specific member
       if (selectedMemberId !== 'all' && r.memberId !== selectedMemberId) {
         return false;
       }
-      // Category filter
-      if (selectedCategory !== 'all' && r.category?.toLowerCase() !== selectedCategory.toLowerCase()) {
+      if (selectedCategory !== 'all' && selectedCategory !== 'notas_claves' && r.category?.toLowerCase() !== selectedCategory.toLowerCase()) {
         return false;
       }
       return true;
     });
   }, [records, selectedMemberId, selectedCategory]);
 
-  // Counts per member
-  const recordCountsByMember = useMemo(() => {
-    const counts: Record<string, number> = {};
-    records.forEach((r) => {
-      counts[r.memberId] = (counts[r.memberId] || 0) + 1;
+  // Counts per member (includes records and notes)
+  const memberCounts = useMemo(() => {
+    const counts: Record<string, { records: number; notes: number; total: number }> = {};
+    members.forEach((m) => {
+      counts[m.id] = { records: 0, notes: 0, total: 0 };
     });
+
+    records.forEach((r) => {
+      if (counts[r.memberId]) {
+        counts[r.memberId].records += 1;
+        counts[r.memberId].total += 1;
+      }
+    });
+
+    passwords.forEach((p) => {
+      if (p.memberId && counts[p.memberId]) {
+        counts[p.memberId].notes += 1;
+        counts[p.memberId].total += 1;
+      }
+    });
+
     return counts;
-  }, [records]);
+  }, [records, passwords, members]);
 
   // Group filtered records by Category
   const groupedCategories = useMemo(() => {
+    if (selectedCategory === 'notas_claves') {
+      return [];
+    }
+
     const groupMap = new Map<string, PersonalRecord[]>();
 
     filteredRecords.forEach((record) => {
@@ -136,7 +276,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
     });
 
     return result;
-  }, [filteredRecords, categories]);
+  }, [filteredRecords, categories, selectedCategory]);
 
   const toggleCategoryCollapse = (catName: string) => {
     setCollapsedCategories((prev) => ({
@@ -150,6 +290,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
     groupedCategories.forEach((g) => {
       allCollapsed[g.categoryName] = true;
     });
+    allCollapsed['notas_claves'] = true;
     setCollapsedCategories(allCollapsed);
   };
 
@@ -157,9 +298,104 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
     setCollapsedCategories({});
   };
 
+  // Note copy helper
+  const handleCopyNote = (text: string, identifier: string) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    sounds.playCheckSound();
+    setCopiedNoteId(identifier);
+    setTimeout(() => {
+      setCopiedNoteId((curr) => (curr === identifier ? null : curr));
+    }, 2000);
+  };
+
+  // Note WhatsApp share helper
+  const handleShareNoteWhatsApp = (item: PasswordItem) => {
+    let text = `📌 *${item.website || 'NOTA RÁPIDA'}*\n\n` +
+      `${item.notes || ''}\n`;
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text.trim())}`, '_blank');
+  };
+
+  // Note save new
+  const handleSaveNewNote = () => {
+    if (!onAddPassword) return;
+    const trimmedTitle = newNoteTitle.trim();
+    const trimmedText = newNoteText.trim();
+    if (!trimmedTitle && !trimmedText) return;
+
+    onAddPassword({
+      website: trimmedTitle || (trimmedText ? trimmedText.slice(0, 30) : 'Nota Rápida'),
+      notes: trimmedText,
+      memberId: newNoteMemberId || (selectedMemberId !== 'all' ? selectedMemberId : 'all'),
+      color: newNoteColor || 'yellow',
+      category: 'General',
+    });
+
+    sounds.playCheckSound();
+    setIsCreatingNote(false);
+    setNewNoteTitle('');
+    setNewNoteText('');
+  };
+
+  // Note save edit
+  const handleSaveEditNote = (id: string) => {
+    if (!onUpdatePassword) return;
+    const trimmedTitle = editNoteTitle.trim();
+    const trimmedText = editNoteText.trim();
+    if (!trimmedTitle && !trimmedText) return;
+
+    onUpdatePassword(id, {
+      website: trimmedTitle || 'Nota Rápida',
+      notes: trimmedText,
+      memberId: editNoteMemberId || 'all',
+      color: editNoteColor || 'yellow',
+    });
+
+    sounds.playCheckSound();
+    setEditingNoteId(null);
+  };
+
+  const getOwnerBadge = (memberId?: string) => {
+    if (!memberId || memberId === 'all') {
+      return {
+        label: 'Toda la Familia',
+        isAll: true,
+        avatarColor: 'bg-amber-600',
+      };
+    }
+    const member = members.find((m) => m.id === memberId);
+    if (!member) {
+      return {
+        label: 'Compartido',
+        isAll: true,
+        avatarColor: 'bg-slate-500',
+      };
+    }
+    return {
+      label: member.name,
+      isAll: false,
+      avatarColor: member.avatarColor || 'bg-blue-600',
+    };
+  };
+
+  const formatWebsiteUrl = (web: string) => {
+    let clean = (web || '').trim();
+    if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
+      if (clean.includes('.') && !clean.includes(' ')) {
+        clean = 'https://' + clean;
+      } else {
+        return null;
+      }
+    }
+    return clean;
+  };
+
+  const isNotesCategoryActive = selectedCategory === 'all' || selectedCategory === 'notas_claves';
+  const showNotesGroup = isNotesCategoryActive && (filteredNotes.length > 0 || selectedCategory === 'notas_claves' || isCreatingNote);
+
   return (
     <div id="personal-records-section" className="space-y-4 max-w-4xl mx-auto mb-10">
-      {/* Filter Card: Integrantes + Categorías + Subcategorías Jerárquicas con Botones a la derecha */}
+      {/* Filter Card: Integrantes + Categorías */}
       <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           {/* Left side: Filters (Integrantes y Categorías) */}
@@ -187,12 +423,13 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
                   }`}
                 >
                   <span>Todos</span>
-                  <span className="ml-1 text-[10px] opacity-80">({records.length})</span>
+                  <span className="ml-1 text-[10px] opacity-80">({records.length + passwords.length})</span>
                 </button>
 
                 {members.map((m) => {
                   const isSelected = selectedMemberId === m.id;
-                  const count = recordCountsByMember[m.id] || 0;
+                  const countObj = memberCounts[m.id];
+                  const totalCount = countObj ? countObj.total : 0;
                   return (
                     <button
                       key={m.id}
@@ -204,7 +441,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
                       }`}
                     >
                       <span>{m.name}</span>
-                      {count > 0 && (
+                      {totalCount > 0 && (
                         <span
                           className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
                             isSelected
@@ -212,7 +449,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
                               : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
                           }`}
                         >
-                          {count}
+                          {totalCount}
                         </span>
                       )}
                     </button>
@@ -244,14 +481,41 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
                       : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-slate-300'
                   }`}
                 >
-                  📁 Todas ({records.length})
+                  📁 Todas ({records.length + filteredNotes.length})
+                </button>
+
+                {/* Pill for Notas Rápidas y Claves */}
+                <button
+                  onClick={() => handleCategoryChange('notas_claves')}
+                  className={`px-2.5 py-1 rounded-xl text-xs font-bold shrink-0 transition-all border flex items-center gap-1.5 cursor-pointer ${
+                    selectedCategory === 'notas_claves'
+                      ? 'bg-amber-500 text-slate-950 border-amber-600 shadow-2xs font-black'
+                      : 'bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border-amber-200/80 dark:border-amber-900/60 hover:bg-amber-100'
+                  }`}
+                >
+                  <StickyNote className="w-3.5 h-3.5" />
+                  <span>Notas y Claves</span>
+                  {filteredNotes.length > 0 && (
+                    <span
+                      className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                        selectedCategory === 'notas_claves'
+                          ? 'bg-amber-700 text-white'
+                          : 'bg-amber-200/90 dark:bg-amber-900 text-amber-950 dark:text-amber-200'
+                      }`}
+                    >
+                      {filteredNotes.length}
+                    </span>
+                  )}
                 </button>
 
                 {allCategoryNames.map((catName) => {
                   const isSelected = selectedCategory.toLowerCase() === catName.toLowerCase();
                   const catObj = categories.find((c) => c.name.toLowerCase() === catName.toLowerCase());
                   const countInCat = records.filter(
-                    (r) => r.category?.toLowerCase() === catName.toLowerCase()
+                    (r) => {
+                      if (selectedMemberId !== 'all' && r.memberId !== selectedMemberId) return false;
+                      return r.category?.toLowerCase() === catName.toLowerCase();
+                    }
                   ).length;
 
                   return (
@@ -335,14 +599,14 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
         </div>
       </div>
 
-      {/* ================= CATEGORY-GROUPED RECORDS VIEW ================= */}
-      {groupedCategories.length > 0 ? (
+      {/* ================= CATEGORY-GROUPED RECORDS & NOTAS VIEW ================= */}
+      {(groupedCategories.length > 0 || showNotesGroup) ? (
         <div className="space-y-4">
-          {/* Controls to Collapse / Expand All (if more than 1 category) */}
-          {groupedCategories.length > 1 && (
+          {/* Controls to Collapse / Expand All */}
+          {(groupedCategories.length + (showNotesGroup ? 1 : 0)) > 1 && (
             <div className="flex items-center justify-between px-2 text-xs text-slate-500 dark:text-slate-400">
               <span className="font-bold">
-                {groupedCategories.length} {groupedCategories.length === 1 ? 'categoría' : 'categorías'} con datos ({filteredRecords.length} {filteredRecords.length === 1 ? 'registro' : 'registros'})
+                {groupedCategories.length + (showNotesGroup ? 1 : 0)} categorías ({filteredRecords.length + (showNotesGroup ? filteredNotes.length : 0)} registros)
               </span>
               <div className="flex items-center gap-2">
                 <button
@@ -364,6 +628,377 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
             </div>
           )}
 
+          {/* ================= 📌 NOTAS RÁPIDAS Y CLAVES POST-IT GROUP ================= */}
+          {showNotesGroup && (
+            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-amber-200 dark:border-amber-900/60 shadow-2xs overflow-hidden transition-all">
+              {/* Notas Category Header */}
+              <div
+                onClick={() => toggleCategoryCollapse('notas_claves')}
+                className="px-4 sm:px-5 py-3.5 bg-amber-50/60 dark:bg-amber-950/40 border-b border-amber-100 dark:border-amber-900/60 flex items-center justify-between gap-3 cursor-pointer select-none hover:bg-amber-100/50 dark:hover:bg-amber-950/60 transition-colors"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center shrink-0 shadow-xs font-black">
+                    <StickyNote className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white truncate">
+                        Notas Rápidas y Claves
+                      </h3>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-black bg-amber-200/90 dark:bg-amber-900 text-amber-950 dark:text-amber-200 border border-amber-300 dark:border-amber-800">
+                        {filteredNotes.length} {filteredNotes.length === 1 ? 'nota' : 'notas'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {/* Admin quick add note */}
+                  {isAdmin && onAddPassword && !isCreatingNote && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsCreatingNote(true);
+                        setNewNoteMemberId(selectedMemberId !== 'all' ? selectedMemberId : 'all');
+                        setNewNoteColor('yellow');
+                        setNewNoteTitle('');
+                        setNewNoteText('');
+                        setCollapsedCategories((prev) => ({ ...prev, notas_claves: false }));
+                      }}
+                      className="px-2.5 py-1 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black flex items-center gap-1 shadow-2xs transition-all cursor-pointer border border-amber-600"
+                      title="Agregar nueva nota adhesiva"
+                    >
+                      <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                      <span className="hidden sm:inline">Nueva Nota</span>
+                    </button>
+                  )}
+
+                  {/* Chevron expand/collapse */}
+                  <button
+                    type="button"
+                    className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                  >
+                    {collapsedCategories['notas_claves'] ? (
+                      <ChevronDown className="w-4 h-4" />
+                    ) : (
+                      <ChevronUp className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Notas Body: Grid of Post-it Cards */}
+              {!collapsedCategories['notas_claves'] && (
+                <div className="p-3 sm:p-4 bg-amber-50/20 dark:bg-amber-950/10">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {/* In-line creation inside Datos */}
+                    {isCreatingNote && (
+                      <div
+                        className={`relative rounded-3xl p-4 border-2 border-dashed flex flex-col justify-between transition-all duration-200 shadow-xl ${
+                          THEMES_MAP[newNoteColor]?.card || THEMES_MAP.yellow.card
+                        }`}
+                      >
+                        {/* Scotch Tape */}
+                        <div
+                          className={`w-20 h-3.5 mx-auto -mt-6 mb-2 rounded-xs backdrop-blur-md opacity-85 rotate-[-0.5deg] shadow-2xs ${
+                            THEMES_MAP[newNoteColor]?.tape || THEMES_MAP.yellow.tape
+                          }`}
+                        />
+
+                        {/* Controls: Color Dots & Owner */}
+                        <div className="space-y-2.5 flex-1">
+                          <div className="flex items-center justify-between gap-1.5 flex-wrap pb-1.5 border-b border-black/10 dark:border-white/10">
+                            <div className="flex items-center gap-1">
+                              {POSTIT_COLORS.map((c) => (
+                                <button
+                                  key={c.id}
+                                  type="button"
+                                  onClick={() => setNewNoteColor(c.id)}
+                                  className={`w-4 h-4 rounded-full border border-black/20 cursor-pointer ${c.dotClass} ${
+                                    newNoteColor === c.id ? 'scale-125 ring-2 ring-slate-950 dark:ring-white' : 'opacity-70'
+                                  }`}
+                                  title={c.name}
+                                />
+                              ))}
+                            </div>
+
+                            <select
+                              value={newNoteMemberId}
+                              onChange={(e) => setNewNoteMemberId(e.target.value)}
+                              className="text-[11px] font-bold bg-white/70 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-lg px-1.5 py-0.5 outline-none cursor-pointer"
+                            >
+                              <option value="all">👥 Familia</option>
+                              {members.map((m) => (
+                                <option key={m.id} value={m.id}>
+                                  👤 {m.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <input
+                            ref={noteTitleInputRef}
+                            type="text"
+                            value={newNoteTitle}
+                            onChange={(e) => setNewNoteTitle(e.target.value)}
+                            placeholder="Título de la nota..."
+                            className="w-full px-2.5 py-1.5 text-xs sm:text-sm font-black bg-white/60 dark:bg-black/30 border border-black/10 dark:border-white/10 rounded-xl placeholder-slate-500/70 outline-none"
+                            onKeyDown={(e) => {
+                              if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                                handleSaveNewNote();
+                              }
+                            }}
+                          />
+
+                          <textarea
+                            rows={3}
+                            value={newNoteText}
+                            onChange={(e) => setNewNoteText(e.target.value)}
+                            placeholder="Escribe aquí tu nota..."
+                            className="w-full px-2.5 py-1.5 text-xs bg-white/60 dark:bg-black/30 border border-black/10 dark:border-white/10 rounded-xl placeholder-slate-500/70 outline-none resize-none"
+                            onKeyDown={(e) => {
+                              if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                                handleSaveNewNote();
+                              }
+                            }}
+                          />
+                        </div>
+
+                        {/* Actions */}
+                        <div className="pt-2 mt-2 border-t border-black/10 dark:border-white/10 flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setIsCreatingNote(false)}
+                            className="px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-black/10 cursor-pointer"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleSaveNewNote}
+                            disabled={!newNoteTitle.trim() && !newNoteText.trim()}
+                            className="px-3 py-1 rounded-lg text-xs font-black bg-slate-950 text-white dark:bg-white dark:text-slate-950 cursor-pointer shadow-xs disabled:opacity-40"
+                          >
+                            Guardar
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Existing Notes */}
+                    {filteredNotes.map((note) => {
+                      const isEditing = editingNoteId === note.id;
+                      const colorKey = note.color && THEMES_MAP[note.color] ? note.color : 'yellow';
+                      const theme = THEMES_MAP[colorKey];
+                      const ownerBadge = getOwnerBadge(note.memberId);
+                      const isCopied = copiedNoteId === `datos_note_${note.id}`;
+                      const webUrl = formatWebsiteUrl(note.website);
+
+                      if (isEditing) {
+                        const editTheme = THEMES_MAP[editNoteColor] || theme;
+                        return (
+                          <div
+                            key={note.id}
+                            className={`relative rounded-3xl p-4 border-2 border-amber-400 flex flex-col justify-between transition-all duration-200 shadow-xl ${editTheme.card}`}
+                          >
+                            <div
+                              className={`w-20 h-3.5 mx-auto -mt-6 mb-2 rounded-xs backdrop-blur-md opacity-85 rotate-[-0.5deg] shadow-2xs ${editTheme.tape}`}
+                            />
+
+                            <div className="space-y-2.5 flex-1">
+                              <div className="flex items-center justify-between gap-1.5 flex-wrap pb-1.5 border-b border-black/10 dark:border-white/10">
+                                <div className="flex items-center gap-1">
+                                  {POSTIT_COLORS.map((c) => (
+                                    <button
+                                      key={c.id}
+                                      type="button"
+                                      onClick={() => setEditNoteColor(c.id)}
+                                      className={`w-4 h-4 rounded-full border border-black/20 cursor-pointer ${c.dotClass} ${
+                                        editNoteColor === c.id ? 'scale-125 ring-2 ring-slate-950 dark:ring-white' : 'opacity-70'
+                                      }`}
+                                      title={c.name}
+                                    />
+                                  ))}
+                                </div>
+
+                                <select
+                                  value={editNoteMemberId}
+                                  onChange={(e) => setEditNoteMemberId(e.target.value)}
+                                  className="text-[11px] font-bold bg-white/70 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-lg px-1.5 py-0.5 outline-none cursor-pointer"
+                                >
+                                  <option value="all">👥 Familia</option>
+                                  {members.map((m) => (
+                                    <option key={m.id} value={m.id}>
+                                      👤 {m.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <input
+                                type="text"
+                                value={editNoteTitle}
+                                onChange={(e) => setEditNoteTitle(e.target.value)}
+                                placeholder="Título de la nota..."
+                                className="w-full px-2.5 py-1.5 text-xs sm:text-sm font-black bg-white/60 dark:bg-black/30 border border-black/10 dark:border-white/10 rounded-xl outline-none"
+                              />
+
+                              <textarea
+                                rows={3}
+                                value={editNoteText}
+                                onChange={(e) => setEditNoteText(e.target.value)}
+                                placeholder="Escribe aquí tu nota..."
+                                className="w-full px-2.5 py-1.5 text-xs bg-white/60 dark:bg-black/30 border border-black/10 dark:border-white/10 rounded-xl outline-none resize-none"
+                              />
+                            </div>
+
+                            <div className="pt-2 mt-2 border-t border-black/10 dark:border-white/10 flex items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => setEditingNoteId(null)}
+                                className="px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-black/10 cursor-pointer"
+                              >
+                                Cancelar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleSaveEditNote(note.id)}
+                                disabled={!editNoteTitle.trim() && !editNoteText.trim()}
+                                className="px-3 py-1 rounded-lg text-xs font-black bg-slate-950 text-white dark:bg-white dark:text-slate-950 cursor-pointer shadow-xs disabled:opacity-40"
+                              >
+                                Guardar
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div
+                          key={note.id}
+                          className={`relative rounded-3xl p-4 border transition-all duration-200 hover:-translate-y-1 hover:shadow-lg flex flex-col justify-between group ${theme.card}`}
+                        >
+                          <div
+                            className={`w-20 h-3.5 mx-auto -mt-6 mb-2 rounded-xs backdrop-blur-md opacity-85 rotate-[-0.5deg] shadow-2xs ${theme.tape}`}
+                          />
+
+                          <div className="flex items-center justify-between gap-1 mb-2">
+                            <div
+                              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[10px] font-black border ${theme.badge}`}
+                            >
+                              {ownerBadge.isAll ? (
+                                <Users className="w-3 h-3" />
+                              ) : (
+                                <span className={`w-2 h-2 rounded-full ${ownerBadge.avatarColor}`} />
+                              )}
+                              <span>{ownerBadge.label}</span>
+                            </div>
+                          </div>
+
+                          <div className="space-y-1.5 flex-1">
+                            <div className="flex items-start justify-between gap-1">
+                              <h4 className="text-xs sm:text-sm font-black tracking-tight leading-snug break-words">
+                                {note.website}
+                              </h4>
+                              {webUrl && (
+                                <a
+                                  href={webUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="p-0.5 rounded opacity-70 hover:opacity-100 shrink-0"
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              )}
+                            </div>
+
+                            {note.notes ? (
+                              <div className="p-2.5 rounded-xl bg-white/40 dark:bg-black/20 border border-black/5 dark:border-white/5">
+                                <p className="text-[11px] sm:text-xs whitespace-pre-wrap leading-relaxed font-sans select-text">
+                                  {note.notes}
+                                </p>
+                              </div>
+                            ) : null}
+                          </div>
+
+                          <div className="pt-2 mt-2 border-t border-black/10 dark:border-white/10 flex items-center justify-between gap-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const full = `${note.website ? `📌 ${note.website}\n\n` : ''}${note.notes || ''}`.trim();
+                                handleCopyNote(full, `datos_note_${note.id}`);
+                              }}
+                              className={`px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer bg-white/40 dark:bg-black/20 ${theme.actionHover}`}
+                              title="Copiar texto de la nota"
+                            >
+                              {isCopied ? (
+                                <>
+                                  <Check className="w-2.5 h-2.5 text-emerald-700 dark:text-emerald-400 stroke-[3]" />
+                                  <span>¡Copiado!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-2.5 h-2.5 opacity-75" />
+                                  <span>Copiar</span>
+                                </>
+                              )}
+                            </button>
+
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleShareNoteWhatsApp(note)}
+                                className="p-1 rounded-lg hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 transition-colors cursor-pointer"
+                                title="Compartir por WhatsApp"
+                              >
+                                <Share2 className="w-3.5 h-3.5" />
+                              </button>
+
+                              {isAdmin && onUpdatePassword && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingNoteId(note.id);
+                                    setEditNoteTitle(note.website || '');
+                                    setEditNoteText(note.notes || '');
+                                    setEditNoteMemberId(note.memberId || 'all');
+                                    setEditNoteColor(note.color || 'yellow');
+                                    setIsCreatingNote(false);
+                                  }}
+                                  className="p-1 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 opacity-75 hover:opacity-100 transition-colors cursor-pointer"
+                                  title="Editar nota"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+
+                              {isAdmin && onDeletePassword && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (window.confirm(`¿Seguro que deseas eliminar la nota "${note.website}"?`)) {
+                                      onDeletePassword(note.id);
+                                    }
+                                  }}
+                                  className="p-1 rounded-lg hover:bg-red-500/20 text-red-700 dark:text-red-400 transition-colors cursor-pointer"
+                                  title="Eliminar nota"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ================= REGULAR PERSONAL RECORDS CATEGORY GROUPS ================= */}
           {groupedCategories.map((group) => {
             const isCollapsed = !!collapsedCategories[group.categoryName];
             const catColor = group.categoryObj?.color || '#dc2626';
@@ -466,16 +1101,16 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
             <Folder className="w-6 h-6" />
           </div>
           <h3 className="text-base font-bold text-slate-900 dark:text-white">
-            No se encontraron datos personales
+            No se encontraron datos personales ni notas
           </h3>
           <p className="text-xs text-slate-500 max-w-sm mx-auto">
             {selectedCategory !== 'all'
-              ? `No hay datos registrados en la categoría "${selectedCategory}".`
-              : 'Aún no hay documentos ni datos personales registrados.'}
+              ? `No hay datos registrados en la categoría seleccionada.`
+              : 'Aún no hay documentos ni notas registradas.'}
           </p>
           {isAdmin && (
             <button
-              onClick={() => onOpenAddRecord(selectedCategory !== 'all' ? { category: selectedCategory } : undefined)}
+              onClick={() => onOpenAddRecord(selectedCategory !== 'all' && selectedCategory !== 'notas_claves' ? { category: selectedCategory } : undefined)}
               className="px-4 py-2 rounded-2xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer shadow-md"
             >
               <Plus className="w-3.5 h-3.5" />

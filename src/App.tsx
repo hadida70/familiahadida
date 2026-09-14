@@ -573,6 +573,7 @@ export default function App() {
           /* DATOS PERSONALES Y ADJUNTOS VIEW */
           <PersonalRecordsView
             records={data.personalRecords || []}
+            passwords={data.passwords || []}
             members={data.members}
             categories={data.dataCategories || []}
             activeMember={activeMember}
@@ -598,6 +599,9 @@ export default function App() {
             onUpdateRecordTodos={(recordId, todos) =>
               updatePersonalRecord(recordId, { todos })
             }
+            onAddPassword={addPassword}
+            onUpdatePassword={updatePassword}
+            onDeletePassword={deletePassword}
           />
         ) : activeTab === 'categories' ? (
           /* PANEL DE ADMINISTRACIÓN DE CATEGORÍAS Y SUBCATEGORÍAS */
