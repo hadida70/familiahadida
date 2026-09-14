@@ -141,12 +141,13 @@ export interface TodoItem {
 
 export interface PasswordItem {
   id: string;
-  website: string; // Página Web / App / Servicio (e.g. "Google", "Banco Santander", "Netflix")
+  website: string; // Página Web / App / Servicio / Título
   email: string;   // Correo / Usuario
-  password: string; // Contraseña
-  notes?: string;   // Nota / Detalles adicionales
-  category?: string; // e.g. 'General', 'Bancos', 'Streaming', 'Servicios', 'Trabajo', 'Personal'
+  password: string; // Contraseña / Clave
+  notes?: string;   // Nota libre / Contenido del post-it
+  category?: string; // e.g. 'General', 'Bancos', 'Streaming', 'Servicios', 'Trabajo', 'Personal', 'Hogar'
   memberId?: string; // Integrante propietario opcional o 'all'
+  color?: 'yellow' | 'pink' | 'green' | 'blue' | 'purple' | 'orange' | string; // Color del post-it
   createdAt: string;
   updatedAt?: string;
 }

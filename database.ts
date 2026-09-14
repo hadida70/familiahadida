@@ -220,10 +220,17 @@ export function initDatabase() {
       notes TEXT DEFAULT '',
       category TEXT DEFAULT 'General',
       member_id TEXT DEFAULT 'all',
+      color TEXT DEFAULT 'yellow',
       created_at TEXT NOT NULL,
       updated_at TEXT
     );
   `);
+
+  try {
+    db.exec(`ALTER TABLE passwords ADD COLUMN color TEXT DEFAULT 'yellow'`);
+  } catch {
+    // Column already exists
+  }
 
   // Seed or Migrate if empty
   const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };
@@ -566,7 +573,7 @@ export function getAllAppData(): AppData {
   const taskRows = db.prepare('SELECT id, title, description, date, time, assigned_to_id as assignedToId, completed, completed_at as completedAt, category, urgent, created_at as createdAt, updated_at as updatedAt FROM calendar_tasks ORDER BY date ASC, time ASC').all() as any[];
   const contactRows = db.prepare('SELECT id, name, phone, email, notes, address, place_name as placeName, created_at as createdAt, updated_at as updatedAt FROM contacts ORDER BY name ASC').all() as Contact[];
   const todoRows = db.prepare('SELECT id, text, completed, assigned_to_id as assignedToId, category, due_date as dueDate, completed_at as completedAt, created_at as createdAt, updated_at as updatedAt FROM todos ORDER BY created_at DESC').all() as any[];
-  const passwordRows = db.prepare('SELECT id, website, email, password, notes, category, member_id as memberId, created_at as createdAt, updated_at as updatedAt FROM passwords ORDER BY created_at DESC').all() as PasswordItem[];
+  const passwordRows = db.prepare('SELECT id, website, email, password, notes, category, member_id as memberId, color, created_at as createdAt, updated_at as updatedAt FROM passwords ORDER BY created_at DESC').all() as PasswordItem[];
   const notifRows = db.prepare('SELECT id, recipient_id as recipientId, title, message, timestamp, read, type, item_id as itemId, list_id as listId, task_id as taskId FROM notifications ORDER BY timestamp DESC LIMIT 50').all() as any[];
 
   return {
@@ -1295,16 +1302,17 @@ export function markNotificationsAsRead(recipientId?: string, notificationId?: s
 // Passwords
 export function insertPassword(item: PasswordItem) {
   db.prepare(`
-    INSERT INTO passwords (id, website, email, password, notes, category, member_id, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO passwords (id, website, email, password, notes, category, member_id, color, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     item.id,
     item.website,
-    item.email,
-    item.password,
+    item.email || '',
+    item.password || '',
     item.notes || '',
     item.category || 'General',
     item.memberId || 'all',
+    item.color || 'yellow',
     item.createdAt,
     item.updatedAt || null
   );
@@ -1320,13 +1328,14 @@ export function updatePassword(id: string, updates: Partial<PasswordItem>) {
   const notes = updates.notes !== undefined ? updates.notes : current.notes;
   const category = updates.category !== undefined ? updates.category : current.category;
   const memberId = updates.memberId !== undefined ? updates.memberId : current.member_id;
+  const color = updates.color !== undefined ? updates.color : (current.color || 'yellow');
   const updatedAt = new Date().toISOString();
 
   db.prepare(`
     UPDATE passwords
-    SET website = ?, email = ?, password = ?, notes = ?, category = ?, member_id = ?, updated_at = ?
+    SET website = ?, email = ?, password = ?, notes = ?, category = ?, member_id = ?, color = ?, updated_at = ?
     WHERE id = ?
-  `).run(website, email, password, notes, category, memberId, updatedAt, id);
+  `).run(website, email, password, notes, category, memberId, color, updatedAt, id);
 
   return {
     id,
@@ -1336,6 +1345,7 @@ export function updatePassword(id: string, updates: Partial<PasswordItem>) {
     notes,
     category,
     memberId,
+    color,
     createdAt: current.created_at,
     updatedAt,
   };

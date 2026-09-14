@@ -11,6 +11,9 @@ import {
   Key,
   User,
   Check,
+  StickyNote,
+  Palette,
+  Tag,
 } from 'lucide-react';
 import { Member, PasswordItem } from '../types';
 import { sounds } from '../lib/sound';
@@ -23,6 +26,51 @@ interface AddPasswordModalProps {
   members: Member[];
   activeMember: Member | null;
 }
+
+const POSTIT_COLORS = [
+  {
+    id: 'yellow',
+    name: 'Amarillo Clásico',
+    bgClass: 'bg-amber-100 border-amber-300 text-amber-900',
+    swatchClass: 'bg-amber-300 border-amber-400',
+    ringClass: 'ring-amber-400',
+  },
+  {
+    id: 'pink',
+    name: 'Rosa Pastel',
+    bgClass: 'bg-pink-100 border-pink-300 text-pink-900',
+    swatchClass: 'bg-pink-300 border-pink-400',
+    ringClass: 'ring-pink-400',
+  },
+  {
+    id: 'green',
+    name: 'Verde Menta',
+    bgClass: 'bg-emerald-100 border-emerald-300 text-emerald-900',
+    swatchClass: 'bg-emerald-300 border-emerald-400',
+    ringClass: 'ring-emerald-400',
+  },
+  {
+    id: 'blue',
+    name: 'Azul Cielo',
+    bgClass: 'bg-sky-100 border-sky-300 text-sky-900',
+    swatchClass: 'bg-sky-300 border-sky-400',
+    ringClass: 'ring-sky-400',
+  },
+  {
+    id: 'purple',
+    name: 'Lavanda',
+    bgClass: 'bg-purple-100 border-purple-300 text-purple-900',
+    swatchClass: 'bg-purple-300 border-purple-400',
+    ringClass: 'ring-purple-400',
+  },
+  {
+    id: 'orange',
+    name: 'Naranja Cálido',
+    bgClass: 'bg-orange-100 border-orange-300 text-orange-900',
+    swatchClass: 'bg-orange-300 border-orange-400',
+    ringClass: 'ring-orange-400',
+  },
+];
 
 export const AddPasswordModal: React.FC<AddPasswordModalProps> = ({
   isOpen,
@@ -37,7 +85,10 @@ export const AddPasswordModal: React.FC<AddPasswordModalProps> = ({
   const [password, setPassword] = useState('');
   const [notes, setNotes] = useState('');
   const [memberId, setMemberId] = useState('all');
+  const [category, setCategory] = useState('General');
+  const [color, setColor] = useState<string>('yellow');
   const [showPassword, setShowPassword] = useState(false);
+  const [showExtraCredentials, setShowExtraCredentials] = useState(false);
   const [generatedFlash, setGeneratedFlash] = useState(false);
 
   useEffect(() => {
@@ -47,14 +98,20 @@ export const AddPasswordModal: React.FC<AddPasswordModalProps> = ({
       setPassword(editingPassword.password || '');
       setNotes(editingPassword.notes || '');
       setMemberId(editingPassword.memberId || 'all');
+      setCategory(editingPassword.category || 'General');
+      setColor(editingPassword.color || 'yellow');
       setShowPassword(false);
+      setShowExtraCredentials(!!(editingPassword.email || editingPassword.password));
     } else {
       setWebsite('');
-      setEmail(activeMember?.name ? `${activeMember.name.toLowerCase().replace(/\s+/g, '')}@gmail.com` : '');
+      setEmail('');
       setPassword('');
       setNotes('');
       setMemberId(activeMember?.id || 'all');
+      setCategory('General');
+      setColor('yellow');
       setShowPassword(true);
+      setShowExtraCredentials(true);
     }
   }, [editingPassword, isOpen, activeMember]);
 
@@ -71,54 +128,59 @@ export const AddPasswordModal: React.FC<AddPasswordModalProps> = ({
     setShowPassword(true);
     setGeneratedFlash(true);
     sounds.playAddSound();
-    setTimeout(() => setGeneratedFlash(false), 2000);
+    setTimeout(() => setGeneratedFlash(false), 2500);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!website.trim() || !password.trim()) return;
+    const finalTitle = website.trim() || (notes.trim() ? notes.trim().slice(0, 30) : 'Nota Rápida');
+    if (!finalTitle && !notes.trim()) return;
 
     onSave({
-      website: website.trim(),
+      website: finalTitle,
       email: email.trim(),
       password: password.trim(),
       notes: notes.trim(),
+      category: category || 'General',
       memberId: memberId || 'all',
+      color: color || 'yellow',
     });
 
     sounds.playCheckSound();
     onClose();
   };
 
+  const activeColorObj = POSTIT_COLORS.find((c) => c.id === color) || POSTIT_COLORS[0];
+
   return (
     <div
       id="modal-add-password-overlay"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto"
       onClick={onClose}
     >
       <div
         id="modal-add-password-content"
-        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden my-6 transition-all"
+        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden my-4 transition-all"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+        {/* Post-it Header with Live Color Bar */}
+        <div className={`px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between ${activeColorObj.bgClass} bg-opacity-20`}>
           <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-red-50 dark:bg-red-950/40 text-red-600 flex items-center justify-center border border-red-200/50">
-              <Key className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-2xl bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-200/60 dark:border-slate-700 shadow-2xs">
+              <StickyNote className="w-5 h-5" />
             </div>
             <div>
               <h2 className="text-base font-black text-slate-900 dark:text-white">
-                {editingPassword ? 'Editar Contraseña' : 'Nueva Contraseña'}
+                {editingPassword ? 'Editar Nota Adhesiva / Clave' : 'Nueva Nota Rápida (Post-It)'}
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Guarda accesos web, cuentas, correos y notas seguras
+                Escribe libremente accesos, recordatorios y asigna al propietario
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-white/80 dark:hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -126,117 +188,192 @@ export const AddPasswordModal: React.FC<AddPasswordModalProps> = ({
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
-          {/* Página Web / Servicio */}
+          {/* 1. Selector de Color del Post-It */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1.5">
+              <Palette className="w-3.5 h-3.5 text-amber-500" />
+              <span>Color de la Nota Adhesiva:</span>
+            </label>
+            <div className="flex items-center gap-2.5 flex-wrap">
+              {POSTIT_COLORS.map((c) => {
+                const isSelected = color === c.id;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => {
+                      setColor(c.id);
+                      sounds.playAddSound();
+                    }}
+                    className={`h-9 px-3 rounded-xl border flex items-center gap-2 text-xs font-bold transition-all cursor-pointer shadow-2xs ${
+                      isSelected
+                        ? `${c.swatchClass} text-slate-900 ring-2 ring-offset-2 ring-slate-900 dark:ring-white scale-105`
+                        : `${c.bgClass} opacity-80 hover:opacity-100`
+                    }`}
+                    title={c.name}
+                  >
+                    <span className="w-3.5 h-3.5 rounded-full border border-black/20" style={{ backgroundColor: isSelected ? '#ffffff' : undefined }} />
+                    <span>{c.name.split(' ')[0]}</span>
+                    {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 2. Asignar Propietario */}
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
-              <Globe className="w-3.5 h-3.5 text-red-500" />
-              <span>Página Web / App / Servicio <span className="text-red-500">*</span></span>
+              <User className="w-3.5 h-3.5 text-red-500" />
+              <span>Asignar a Propietario (Familiar):</span>
+            </label>
+            <select
+              value={memberId}
+              onChange={(e) => setMemberId(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs sm:text-sm font-medium outline-none focus:ring-2 focus:ring-amber-500/30 cursor-pointer"
+            >
+              <option value="all">👥 Toda la Familia (Nota Compartida)</option>
+              {members.map((m) => (
+                <option key={m.id} value={m.id}>
+                  👤 {m.name} {m.role === 'admin' ? '(Admin)' : ''}
+                </option>
+              ))}
+            </select>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+              * El familiar seleccionado solo podrá ver esta nota en modo lectura.
+            </p>
+          </div>
+
+          {/* 3. Título / Asunto de la Nota */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
+              <Globe className="w-3.5 h-3.5 text-amber-500" />
+              <span>Título / Asunto / Servicio <span className="text-red-500">*</span></span>
             </label>
             <input
               type="text"
               required
               value={website}
               onChange={(e) => setWebsite(e.target.value)}
-              placeholder="Ej: netflix.com, Banco Santander, Gmail, Amazon..."
-              className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm font-medium focus:ring-2 focus:ring-red-500/30 focus:border-red-500 outline-none transition-all placeholder-slate-400"
+              placeholder="Ej: Clave WiFi Casa, Netflix TV Sala, Alarma Prosegur, Banco..."
+              className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm font-medium focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 outline-none transition-all placeholder-slate-400"
             />
           </div>
 
-          {/* Correo / Usuario */}
+          {/* 4. Contenido / Nota Libre (Área principal del Post-It) */}
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
-              <Mail className="w-3.5 h-3.5 text-red-500" />
-              <span>Correo Electrónico / Nombre de Usuario</span>
+              <FileText className="w-3.5 h-3.5 text-amber-500" />
+              <span>Texto / Contenido Libre de la Nota:</span>
             </label>
-            <input
-              type="text"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Ej: jaime@gmail.com o usuario_admin"
-              className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm font-medium focus:ring-2 focus:ring-red-500/30 focus:border-red-500 outline-none transition-all placeholder-slate-400"
+            <textarea
+              rows={4}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Escribe libremente aquí cualquier nota rápida, instrucciones, códigos de acceso, preguntas secretas, detalles de la cuenta o claves..."
+              className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs sm:text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/30 resize-none font-sans leading-relaxed"
             />
           </div>
 
-          {/* Contraseña con Generador y Ojo */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                <Lock className="w-3.5 h-3.5 text-red-500" />
-                <span>Contraseña <span className="text-red-500">*</span></span>
-              </label>
-
-              {/* Botón de Generar Contraseña */}
+          {/* 5. Campos Rápidos de Usuario y Contraseña (Colapsables/Opcionales) */}
+          <div className="border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 bg-slate-50/50 dark:bg-slate-800/30 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <Key className="w-3.5 h-3.5 text-amber-500" />
+                <span>Datos de Acceso Rápidos (Opcional)</span>
+              </span>
               <button
                 type="button"
-                onClick={generateSecurePassword}
-                className="text-[11px] font-extrabold text-red-600 hover:text-red-700 dark:text-red-400 flex items-center gap-1 cursor-pointer bg-red-50 dark:bg-red-950/40 px-2 py-0.5 rounded-lg border border-red-200 dark:border-red-900/50 hover:bg-red-100 transition-colors"
-                title="Crear una contraseña aleatoria de alta seguridad"
+                onClick={() => setShowExtraCredentials(!showExtraCredentials)}
+                className="text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
               >
-                <Sparkles className="w-3 h-3 text-red-500" />
-                <span>Generar Segura</span>
+                {showExtraCredentials ? 'Ocultar campos' : '+ Agregar usuario / clave'}
               </button>
             </div>
 
-            <div className="relative">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Ingresa la contraseña..."
-                className="w-full px-3.5 py-2.5 pr-11 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm font-mono tracking-wider focus:ring-2 focus:ring-red-500/30 focus:border-red-500 outline-none transition-all placeholder-slate-400"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
-                title={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
-              >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
+            {showExtraCredentials && (
+              <div className="space-y-3 pt-1">
+                {/* Usuario / Email */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1 flex items-center gap-1">
+                    <Mail className="w-3 h-3 text-slate-400" />
+                    <span>Correo / Usuario:</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Ej: jaime@gmail.com o usuario123"
+                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-medium focus:ring-2 focus:ring-amber-500/30 outline-none"
+                  />
+                </div>
 
-            {generatedFlash && (
-              <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
-                <Check className="w-3 h-3" />
-                <span>¡Contraseña segura de 16 caracteres generada!</span>
-              </p>
+                {/* Contraseña con Generador y Toggle */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 flex items-center gap-1">
+                      <Lock className="w-3 h-3 text-slate-400" />
+                      <span>Contraseña / PIN:</span>
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={generateSecurePassword}
+                      className="text-[10px] font-extrabold text-amber-700 dark:text-amber-400 flex items-center gap-1 cursor-pointer bg-amber-100 dark:bg-amber-950/60 px-2 py-0.5 rounded-md border border-amber-300 dark:border-amber-800 hover:bg-amber-200 transition-colors"
+                      title="Generar contraseña de 16 caracteres aleatoria"
+                    >
+                      <Sparkles className="w-2.5 h-2.5 text-amber-500" />
+                      <span>Generar Segura</span>
+                    </button>
+                  </div>
+
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Ingresa la clave..."
+                      className="w-full px-3 py-2 pr-9 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-mono tracking-wider focus:ring-2 focus:ring-amber-500/30 outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                      title={showPassword ? 'Ocultar' : 'Ver'}
+                    >
+                      {showPassword ? <EyeOff className="w-3.5 h-3.5 text-amber-600" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+
+                  {generatedFlash && (
+                    <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
+                      <Check className="w-3 h-3" />
+                      <span>¡Contraseña segura de 16 caracteres generada!</span>
+                    </p>
+                  )}
+                </div>
+              </div>
             )}
           </div>
 
-          {/* Integrante Dueño / Asignado */}
+          {/* Categoría Opcional */}
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
-              <User className="w-3.5 h-3.5 text-red-500" />
-              <span>Perteneciente a Integrante:</span>
+              <Tag className="w-3.5 h-3.5 text-slate-400" />
+              <span>Categoría (Opcional):</span>
             </label>
             <select
-              value={memberId}
-              onChange={(e) => setMemberId(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs sm:text-sm font-medium outline-none focus:ring-2 focus:ring-red-500/30"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full px-3.5 py-2 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-medium outline-none focus:ring-2 focus:ring-amber-500/30 cursor-pointer"
             >
-              <option value="all">👥 Toda la Familia (Compartida)</option>
-              {members.map((m) => (
-                <option key={m.id} value={m.id}>
-                  👤 {m.name}
-                </option>
-              ))}
+              <option value="General">📌 General</option>
+              <option value="Hogar">🏠 Hogar y Servicios</option>
+              <option value="Bancos">💳 Bancos y Finanzas</option>
+              <option value="Streaming">🎬 Streaming y Entretenimiento</option>
+              <option value="Trabajo">💼 Trabajo y Trámites</option>
+              <option value="Personal">👤 Personal</option>
             </select>
-          </div>
-
-          {/* Nota / Observaciones */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
-              <FileText className="w-3.5 h-3.5 text-red-500" />
-              <span>Notas / PIN de Recuperación / Preguntas de Seguridad (Opcional):</span>
-            </label>
-            <textarea
-              rows={2}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Ej: PIN numérico de acceso 1474, preguntas secretas, correo de recuperación..."
-              className="w-full px-3.5 py-2 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs sm:text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500/30 resize-none"
-            />
           </div>
 
           {/* Footer Actions */}
@@ -250,11 +387,11 @@ export const AddPasswordModal: React.FC<AddPasswordModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={!website.trim() || !password.trim()}
-              className="px-5 py-2.5 rounded-2xl text-xs font-bold bg-white dark:bg-slate-900 text-red-600 border border-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-40"
+              disabled={!website.trim() && !notes.trim()}
+              className="px-5 py-2.5 rounded-2xl text-xs font-extrabold bg-amber-500 hover:bg-amber-600 text-slate-950 border border-amber-600 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm hover:shadow-md disabled:opacity-40"
             >
-              <Lock className="w-4 h-4 text-red-500" />
-              <span>{editingPassword ? 'Guardar Cambios' : 'Registrar Contraseña'}</span>
+              <StickyNote className="w-4 h-4 text-slate-950" />
+              <span>{editingPassword ? 'Guardar Nota' : 'Fijar Nota Adhesiva'}</span>
             </button>
           </div>
         </form>

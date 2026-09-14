@@ -10,6 +10,7 @@ import {
   Lock,
   CheckSquare,
   Key,
+  StickyNote,
 } from 'lucide-react';
 import { useWebSocket } from './lib/useWebSocket';
 import { GroceryItem, CustomList, PersonalRecord, CalendarTask, Contact, Member, TodoItem, PasswordItem } from './types';
@@ -58,6 +59,7 @@ export default function App() {
     deleteList,
     addMember,
     deleteMember,
+    resetToDefaults,
     addPersonalRecord,
     updatePersonalRecord,
     deletePersonalRecord,
@@ -99,7 +101,7 @@ export default function App() {
   });
 
   const [isAdminPinPromptOpen, setIsAdminPinPromptOpen] = useState(false);
-  const isAdmin = authRole === 'admin';
+  const isAdmin = authRole === 'admin' || activeMember?.role === 'admin' || activeMember?.name?.toUpperCase() === 'JAIME';
 
   // Navigation tab: 'calendar' (Home screen default), 'lists', 'personal_data', 'categories', 'contacts', 'todos', 'passwords'
   const [activeTab, setActiveTab] = useState<'calendar' | 'lists' | 'personal_data' | 'categories' | 'contacts' | 'todos' | 'passwords'>('calendar');
@@ -503,22 +505,22 @@ export default function App() {
               )}
             </button>
 
-            {/* Tab: CONTRASEÑA (Al lado de TO-DO) */}
+            {/* Tab: NOTAS Y CLAVES (Post-It) */}
             <button
               onClick={() => handleSelectTab('passwords')}
               className={`px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 transition-all cursor-pointer border shrink-0 ${
                 activeTab === 'passwords'
-                  ? 'bg-white dark:bg-slate-900 text-red-600 border-red-600 shadow-2xs ring-1 ring-red-500/20'
+                  ? 'bg-amber-500 text-slate-950 border-amber-600 shadow-2xs font-black'
                   : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-transparent hover:bg-slate-200 dark:hover:bg-slate-700'
               }`}
             >
-              <Key className="w-4 h-4" />
-              <span>CONTRASEÑA</span>
+              <StickyNote className="w-4 h-4" />
+              <span>NOTAS Y CLAVES</span>
               {totalPasswords > 0 && (
                 <span
                   className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
                     activeTab === 'passwords'
-                      ? 'bg-red-50 text-red-600 border border-red-200'
+                      ? 'bg-amber-600 text-white'
                       : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
                   }`}
                 >

@@ -781,7 +781,7 @@ async function startServer() {
     res.json({ success: true });
   });
 
-  // ================= PASSWORDS & CREDENTIALS ROUTES =================
+  // ================= PASSWORDS & POST-IT STICKY NOTES ROUTES =================
 
   // GET /api/passwords
   app.get('/api/passwords', (_req, res) => {
@@ -789,21 +789,23 @@ async function startServer() {
     res.json(data.passwords || []);
   });
 
-  // POST /api/passwords - Create password item
+  // POST /api/passwords - Create password / sticky note item
   app.post('/api/passwords', (req, res) => {
-    const { website, email, password, notes, category, memberId } = req.body;
-    if (!website || !website.trim() || !password || !password.trim()) {
-      return res.status(400).json({ error: 'La página web y la contraseña son obligatorias.' });
+    const { website, title, email, password, notes, category, memberId, color } = req.body;
+    const resolvedTitle = (website || title || '').trim();
+    if (!resolvedTitle && !(notes && notes.trim())) {
+      return res.status(400).json({ error: 'El título o contenido de la nota es obligatorio.' });
     }
 
     const newPassword: PasswordItem = {
       id: 'pwd_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
-      website: website.trim(),
+      website: resolvedTitle || 'Nota Rápida',
       email: email ? email.trim() : '',
-      password: password.trim(),
+      password: password ? password.trim() : '',
       notes: notes ? notes.trim() : '',
       category: category ? category.trim() : 'General',
       memberId: memberId || 'all',
+      color: color || 'yellow',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -812,9 +814,9 @@ async function startServer() {
 
     const notif: PushNotification = {
       id: 'notif_' + Date.now(),
-      recipientId: 'all',
-      title: '🔐 Nueva Contraseña Guardada',
-      message: `Se registró acceso para: ${newPassword.website} (${newPassword.email || 'Sin correo'})`,
+      recipientId: newPassword.memberId || 'all',
+      title: '📌 Nueva Nota Adhesiva / Clave',
+      message: `Se registró nota: "${newPassword.website}"`,
       timestamp: new Date().toISOString(),
       read: false,
       type: 'password_added',
@@ -832,7 +834,7 @@ async function startServer() {
     const { id } = req.params;
     const updated = updatePassword(id, req.body);
     if (!updated) {
-      return res.status(404).json({ error: 'Contraseña no encontrada' });
+      return res.status(404).json({ error: 'Nota / Contraseña no encontrada' });
     }
 
     broadcast('PASSWORD_UPDATED', { password: updated });
@@ -844,7 +846,7 @@ async function startServer() {
     const { id } = req.params;
     const success = deletePassword(id);
     if (!success) {
-      return res.status(404).json({ error: 'Contraseña no encontrada' });
+      return res.status(404).json({ error: 'Nota / Contraseña no encontrada' });
     }
 
     broadcast('PASSWORD_DELETED', { passwordId: id });
