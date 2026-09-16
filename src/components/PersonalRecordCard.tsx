@@ -28,30 +28,11 @@ interface PersonalRecordCardProps {
 }
 
 export const isCreditCardRecord = (record: PersonalRecord) => {
-  const cat = (record.category || '').toLowerCase();
-  const isBank =
-    cat.includes('banco') ||
-    cat.includes('bancos') ||
-    cat.includes('finanza') ||
-    cat.includes('finanzas') ||
-    cat.includes('tarjeta') ||
-    cat.includes('bank');
-
-  // La visualización de la tarjeta de crédito SOLO está disponible en la categoría Banco / Finanzas
-  if (!isBank) return false;
-
-  if (record.cardNumber || record.cardCvc || record.cardExp || record.cardHolder || record.cardAtmPin) return true;
-  const str = `${record.category || ''} ${record.subcategory || ''}`.toLowerCase();
-  return (
-    str.includes('tarjeta') ||
-    str.includes('credito') ||
-    str.includes('crédito') ||
-    str.includes('debito') ||
-    str.includes('débito') ||
-    str.includes('dreamcard') ||
-    str.includes('isracard') ||
-    str.includes('visa') ||
-    str.includes('mastercard')
+  // STRICT: Only render credit card visualizer if it explicitly has card credentials saved
+  return !!(
+    (record.cardNumber && record.cardNumber.trim().length > 0) ||
+    (record.cardCvc && record.cardCvc.trim().length > 0) ||
+    (record.cardAtmPin && record.cardAtmPin.trim().length > 0)
   );
 };
 
@@ -186,7 +167,7 @@ export const PersonalRecordCard: React.FC<PersonalRecordCardProps> = ({
           </div>
         </div>
 
-        {/* ================= CREDIT CARD VISUALIZER (ONLY FOR BANK CATEGORY) ================= */}
+        {/* ================= CREDIT CARD VISUALIZER (ONLY WHEN EXPLICITLY A CARD) ================= */}
         {isCard && (
           <div className="mb-4">
             <CreditCardVisualizer
@@ -202,6 +183,19 @@ export const PersonalRecordCard: React.FC<PersonalRecordCardProps> = ({
               }}
               size="sm"
             />
+          </div>
+        )}
+
+        {/* ================= NOTES / BANK ACCOUNT DETAILS DISPLAY ================= */}
+        {record.notes && record.notes.trim() && (
+          <div className="mb-3.5 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80">
+            <div className="flex items-center gap-1.5 mb-1 text-[11px] font-bold text-slate-600 dark:text-slate-300">
+              <FileText className="w-3.5 h-3.5 text-red-500" />
+              <span>Detalles / Información:</span>
+            </div>
+            <p className="text-xs text-slate-800 dark:text-slate-200 whitespace-pre-line break-words font-medium">
+              {record.notes}
+            </p>
           </div>
         )}
 

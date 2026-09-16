@@ -19,10 +19,18 @@ import {
   Menu,
   Save,
   Palette,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { Member, PersonalRecord, DataCategory, PasswordItem } from '../types';
 import { PersonalRecordCard } from './PersonalRecordCard';
+import { ExcelTableViewer } from './ExcelTableViewer';
 import { sounds } from '../lib/sound';
+import {
+  isTableContent,
+  parseTableContent,
+  tableToTSV,
+  tableToWhatsAppText,
+} from '../lib/tableUtils';
 
 interface PersonalRecordsViewProps {
   records: PersonalRecord[];
@@ -313,8 +321,18 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
 
   // Note WhatsApp share helper
   const handleShareNoteWhatsApp = (item: PasswordItem) => {
-    let text = `🔑 *${item.website || 'CLAVE'}*\n\n` +
-      `${item.notes || ''}\n`;
+    let text = '';
+    if (isTableContent(item.notes)) {
+      const parsed = parseTableContent(item.notes);
+      if (parsed) {
+        text = tableToWhatsAppText(item.website || 'CLAVE', parsed);
+      }
+    }
+
+    if (!text) {
+      text = `🔑 *${item.website || 'CLAVE'}*\n\n${item.notes || ''}\n`;
+    }
+
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text.trim())}`, '_blank');
   };
 
@@ -1210,7 +1228,16 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
                               )}
                             </div>
 
-                            {note.notes ? (
+                            {isTableContent(note.notes) ? (
+                              <div className="pt-1">
+                                <ExcelTableViewer
+                                  table={parseTableContent(note.notes)!}
+                                  title={note.website}
+                                  themeId={note.color}
+                                  compact
+                                />
+                              </div>
+                            ) : note.notes ? (
                               <div className="p-2.5 rounded-xl bg-white/40 dark:bg-black/20 border border-black/5 dark:border-white/5">
                                 <p className="text-[11px] sm:text-xs whitespace-pre-wrap leading-relaxed font-sans select-text">
                                   {note.notes}
@@ -1223,11 +1250,18 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
                             <button
                               type="button"
                               onClick={() => {
-                                const full = `${note.website ? `🔑 ${note.website}\n\n` : ''}${note.notes || ''}`.trim();
+                                let full = '';
+                                if (isTableContent(note.notes)) {
+                                  const parsed = parseTableContent(note.notes);
+                                  if (parsed) full = tableToTSV(parsed);
+                                }
+                                if (!full) {
+                                  full = `${note.website ? `🔑 ${note.website}\n\n` : ''}${note.notes || ''}`.trim();
+                                }
                                 handleCopyNote(full, `datos_note_${note.id}`);
                               }}
                               className={`px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer bg-white/40 dark:bg-black/20 ${theme.actionHover}`}
-                              title="Copiar clave"
+                              title={isTableContent(note.notes) ? 'Copiar tabla en formato Excel' : 'Copiar clave'}
                             >
                               {isCopied ? (
                                 <>
@@ -1237,7 +1271,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
                               ) : (
                                 <>
                                   <Copy className="w-2.5 h-2.5 opacity-75" />
-                                  <span>Copiar</span>
+                                  <span>{isTableContent(note.notes) ? 'Copiar Tabla' : 'Copiar'}</span>
                                 </>
                               )}
                             </button>

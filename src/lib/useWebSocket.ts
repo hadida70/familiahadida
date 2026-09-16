@@ -73,7 +73,7 @@ const DEFAULT_INITIAL_DATA: AppData = {
     { id: 'member_estefania', name: 'ESTEFANIA', username: 'estefania', role: 'member', avatarColor: 'bg-rose-600', avatarInitial: 'E', iconName: 'Sun' },
   ],
   lists: [
-    { id: 'list_supermercado', name: 'Supermercado', icon: 'ShoppingCart', color: 'emerald', description: 'Compras para la casa' },
+    { id: 'list_supermercado', name: 'Supermercado', icon: 'ShoppingCart', color: 'emerald', description: 'Compras para la casa', createdAt: new Date().toISOString() },
   ],
   items: [],
   personalRecords: [],

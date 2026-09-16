@@ -14,9 +14,18 @@ import {
   StickyNote,
   Palette,
   Tag,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { Member, PasswordItem } from '../types';
 import { sounds } from '../lib/sound';
+import { ExcelTableEditor } from './ExcelTableEditor';
+import {
+  ExcelTableData,
+  TABLE_TEMPLATES,
+  isTableContent,
+  parseTableContent,
+  serializeTableContent,
+} from '../lib/tableUtils';
 
 interface AddPasswordModalProps {
   isOpen: boolean;
@@ -84,6 +93,8 @@ export const AddPasswordModal: React.FC<AddPasswordModalProps> = ({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [notes, setNotes] = useState('');
+  const [mode, setMode] = useState<'text' | 'excel'>('text');
+  const [tableData, setTableData] = useState<ExcelTableData>(TABLE_TEMPLATES[0].table);
   const [memberId, setMemberId] = useState('all');
   const [category, setCategory] = useState('General');
   const [color, setColor] = useState<string>('yellow');
@@ -96,17 +107,29 @@ export const AddPasswordModal: React.FC<AddPasswordModalProps> = ({
       setWebsite(editingPassword.website || '');
       setEmail(editingPassword.email || '');
       setPassword(editingPassword.password || '');
-      setNotes(editingPassword.notes || '');
       setMemberId(editingPassword.memberId || 'all');
       setCategory(editingPassword.category || 'General');
       setColor(editingPassword.color || 'yellow');
       setShowPassword(false);
       setShowExtraCredentials(!!(editingPassword.email || editingPassword.password));
+
+      if (isTableContent(editingPassword.notes)) {
+        const parsed = parseTableContent(editingPassword.notes);
+        setMode('excel');
+        setTableData(parsed || TABLE_TEMPLATES[0].table);
+        setNotes('');
+      } else {
+        setMode('text');
+        setNotes(editingPassword.notes || '');
+        setTableData(TABLE_TEMPLATES[0].table);
+      }
     } else {
       setWebsite('');
       setEmail('');
       setPassword('');
       setNotes('');
+      setMode('text');
+      setTableData(TABLE_TEMPLATES[0].table);
       setMemberId(activeMember?.id || 'all');
       setCategory('General');
       setColor('yellow');
@@ -133,14 +156,22 @@ export const AddPasswordModal: React.FC<AddPasswordModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const finalTitle = website.trim() || (notes.trim() ? notes.trim().slice(0, 30) : 'Clave');
-    if (!finalTitle && !notes.trim()) return;
+    const finalTitle = website.trim() || (mode === 'excel' ? 'Tabla Excel' : (notes.trim() ? notes.trim().slice(0, 30) : 'Clave'));
+    let finalNotes = '';
+
+    if (mode === 'excel') {
+      finalNotes = serializeTableContent(tableData);
+    } else {
+      finalNotes = notes.trim();
+    }
+
+    if (!finalTitle && !finalNotes) return;
 
     onSave({
       website: finalTitle,
       email: email.trim(),
       password: password.trim(),
-      notes: notes.trim(),
+      notes: finalNotes,
       category: category || 'General',
       memberId: memberId || 'all',
       color: color || 'yellow',
@@ -171,10 +202,10 @@ export const AddPasswordModal: React.FC<AddPasswordModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-black text-slate-900 dark:text-white">
-                {editingPassword ? 'Editar Clave' : 'Nueva Clave'}
+                {editingPassword ? 'Editar Clave o Tabla' : 'Nueva Clave o Tabla'}
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Escribe libremente accesos, recordatorios y asigna al propietario
+                Escribe libremente accesos o ingresa datos en tablas tipo Excel
               </p>
             </div>
           </div>
@@ -255,27 +286,66 @@ export const AddPasswordModal: React.FC<AddPasswordModalProps> = ({
               required
               value={website}
               onChange={(e) => setWebsite(e.target.value)}
-              placeholder="Ej: Clave WiFi Casa, Netflix TV Sala, Alarma Prosegur, Banco..."
+              placeholder="Ej: Clave WiFi Casa, Netflix TV Sala, Cuentas Bancarias..."
               className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm font-medium focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 outline-none transition-all placeholder-slate-400"
             />
           </div>
 
-          {/* 4. Contenido / Clave Libre (Área principal del Post-It) */}
+          {/* 4. Selector de Modo: Texto Libre vs Excel / Tabla */}
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
               <FileText className="w-3.5 h-3.5 text-amber-500" />
-              <span>Texto / Contenido Libre de la Clave:</span>
+              <span>Tipo de Contenido:</span>
             </label>
-            <textarea
-              rows={4}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Escribe libremente aquí tu clave, instrucciones, códigos de acceso, preguntas secretas o detalles de la cuenta..."
-              className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs sm:text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/30 resize-none font-sans leading-relaxed"
-            />
+            <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700">
+              <button
+                type="button"
+                onClick={() => setMode('text')}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  mode === 'text'
+                    ? 'bg-white dark:bg-slate-900 text-slate-950 dark:text-white shadow-xs font-black'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5 text-amber-500" />
+                <span>Texto Libre</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('excel')}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  mode === 'excel'
+                    ? 'bg-emerald-600 text-white shadow-xs font-black'
+                    : 'text-emerald-700 dark:text-emerald-400 hover:text-emerald-900'
+                }`}
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>Modo Excel / Tabla</span>
+              </button>
+            </div>
           </div>
 
-          {/* 5. Campos Rápidos de Usuario y Contraseña (Colapsables/Opcionales) */}
+          {/* 5. Contenido Dinámico: Área de Texto o Editor de Tabla Excel */}
+          {mode === 'excel' ? (
+            <div>
+              <ExcelTableEditor
+                tableData={tableData}
+                onChange={setTableData}
+              />
+            </div>
+          ) : (
+            <div>
+              <textarea
+                rows={4}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Escribe libremente aquí tu clave, instrucciones, códigos de acceso, preguntas secretas o detalles de la cuenta..."
+                className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs sm:text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/30 resize-none font-sans leading-relaxed"
+              />
+            </div>
+          )}
+
+          {/* 6. Campos Rápidos de Usuario y Contraseña (Colapsables/Opcionales) */}
           <div className="border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 bg-slate-50/50 dark:bg-slate-800/30 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
@@ -387,7 +457,7 @@ export const AddPasswordModal: React.FC<AddPasswordModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={!website.trim() && !notes.trim()}
+              disabled={!website.trim() && (mode === 'text' ? !notes.trim() : false)}
               className="px-5 py-2.5 rounded-2xl text-xs font-extrabold bg-amber-500 hover:bg-amber-600 text-slate-950 border border-amber-600 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm hover:shadow-md disabled:opacity-40"
             >
               <StickyNote className="w-4 h-4 text-slate-950" />

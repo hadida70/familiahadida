@@ -527,7 +527,7 @@ function seedOrMigrateFromLegacy() {
           icon: 'credit-card',
           color: '#059669',
           description: 'Información bancaria, impuestos y comprobantes financieros',
-          subcategories: ['Tarjeta de Crédito', 'Tarjeta de Débito', 'Tarjetas de Crédito / Débito', 'Cuentas Bancarias', 'Declaraciones de Impuestos', 'Comprobantes de Pago', 'Inversiones y Ahorros', 'Préstamos y Créditos'],
+          subcategories: ['Cuentas Bancarias', 'Tarjeta de Débito', 'Tarjeta de Crédito', 'Tarjetas de Crédito / Débito', 'Declaraciones de Impuestos', 'Comprobantes de Pago', 'Inversiones y Ahorros', 'Préstamos y Créditos'],
           isDefault: true,
           createdAt: new Date().toISOString(),
         },

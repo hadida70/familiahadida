@@ -97,8 +97,9 @@ export const SendPersonalRecordModal: React.FC<SendPersonalRecordModalProps> = (
       } else {
         const attCountStr = attachments.length > 0 ? ` (${attachments.length} archivo${attachments.length > 1 ? 's' : ''} adjunto${attachments.length > 1 ? 's' : ''})` : '';
         const todoCountStr = todos.length > 0 ? ` [${todos.filter(t => !t.completed).length} tareas pendientes]` : '';
+        const notesStr = activeRecord.notes ? ` - Info: ${activeRecord.notes}` : '';
         setCustomMessage(
-          `📁 Dato Personal compartido: ${cat} - ${subcat} de ${ownerName}.${attCountStr}${todoCountStr}`
+          `📁 Dato Personal compartido: ${cat} - ${subcat} de ${ownerName}.${attCountStr}${todoCountStr}${notesStr}`
         );
       }
     }
@@ -140,6 +141,10 @@ export const SendPersonalRecordModal: React.FC<SendPersonalRecordModalProps> = (
         `👤 *Titular:* ${activeRecord.cardHolder || ownerName}\n`;
     }
 
+    if (activeRecord.notes && activeRecord.notes.trim()) {
+      text += `\n📝 *Detalles / Información:*\n${activeRecord.notes.trim()}\n`;
+    }
+
     if (attachments.length > 0) {
       text += `\n📎 *Documentos Adjuntos (${attachments.length}):*\n`;
       attachments.forEach((a, i) => {
@@ -176,6 +181,10 @@ export const SendPersonalRecordModal: React.FC<SendPersonalRecordModalProps> = (
       }
       text += `Titular: ${activeRecord.cardHolder || ownerName}\n` +
         `Banco: ${activeRecord.cardBank || ''}\n`;
+    }
+
+    if (activeRecord.notes && activeRecord.notes.trim()) {
+      text += `Detalles / Información:\n${activeRecord.notes.trim()}\n`;
     }
 
     if (attachments.length > 0) {
@@ -219,23 +228,23 @@ export const SendPersonalRecordModal: React.FC<SendPersonalRecordModalProps> = (
   return (
     <div
       id="modal-send-personal-record-overlay"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto"
       onClick={onClose}
     >
       <div
         id="modal-send-personal-record-content"
-        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden my-6 transition-all max-h-[92vh] flex flex-col"
+        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden my-6 transition-all max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0">
+        <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-2xl bg-red-50 dark:bg-red-950/40 text-red-600 flex items-center justify-center border border-red-200/50">
               <Send className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                Enviar o Compartir Datos Personales
+              <h2 className="text-base font-black text-slate-900 dark:text-white uppercase tracking-wide">
+                Compartir Dato Personal
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Envía alertas con adjuntos y listas To-Do a la familia o comparte por WhatsApp
@@ -305,6 +314,13 @@ export const SendPersonalRecordModal: React.FC<SendPersonalRecordModalProps> = (
               )}
             </div>
 
+            {/* Notes / Details Preview */}
+            {activeRecord.notes && activeRecord.notes.trim() && (
+              <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-300 whitespace-pre-line font-medium">
+                {activeRecord.notes}
+              </div>
+            )}
+
             {/* Attached Photos & Documents list */}
             {attachments.length > 0 && (
               <div className="space-y-1.5 pt-1">
@@ -323,10 +339,10 @@ export const SendPersonalRecordModal: React.FC<SendPersonalRecordModalProps> = (
                       className="flex items-center justify-between gap-2 p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
                     >
                       <div className="flex items-center gap-2 min-w-0 flex-1">
-                        {isImg && att.fileDataUrl ? (
+                        {isImg && (att.fileDataUrl || att.fileUrl) ? (
                           <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 border border-slate-200">
                             <img
-                              src={att.fileDataUrl}
+                              src={att.fileDataUrl || att.fileUrl}
                               alt="Adjunto"
                               className="w-full h-full object-cover"
                             />
@@ -450,38 +466,28 @@ export const SendPersonalRecordModal: React.FC<SendPersonalRecordModalProps> = (
             <button
               type="button"
               onClick={handleCopySummary}
-              className="py-2.5 px-3.5 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
-              title="Copiar datos al portapapeles"
+              className="py-2.5 px-3 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
             >
-              {copied ? (
-                <>
-                  <Check className="w-4 h-4 text-emerald-600" />
-                  <span>Copiado</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-4 h-4" />
-                  <span>Copiar</span>
-                </>
-              )}
+              {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+              <span>{copied ? 'Copiado' : 'Copiar'}</span>
             </button>
           </div>
 
-          {/* Modal Action Buttons */}
-          <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100 dark:border-slate-800 shrink-0">
+          {/* Submit Push Notification Action */}
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2">
             <button
               type="button"
               onClick={onClose}
               className="px-4 py-2.5 rounded-2xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
             >
-              Cancelar
+              Cerrar
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 rounded-2xl text-xs font-bold bg-white dark:bg-slate-900 text-red-600 border border-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+              className="px-5 py-2.5 rounded-2xl text-xs font-bold bg-red-600 text-white hover:bg-red-700 transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-red-600/20"
             >
               <Send className="w-4 h-4" />
-              <span>Enviar Notificación a Integrante</span>
+              <span>Enviar Notificación Push</span>
             </button>
           </div>
         </form>

@@ -16,13 +16,10 @@ import {
   File,
   Image as ImageIcon,
   Eye,
-  EyeOff,
   Camera,
   ArrowUp,
   ArrowDown,
   Layers,
-  Check,
-  Info,
   KeyRound,
   ListChecks,
 } from 'lucide-react';
@@ -54,26 +51,16 @@ export const isBankCategory = (cat: string) => {
     str.includes('bancos') ||
     str.includes('finanza') ||
     str.includes('finanzas') ||
-    str.includes('tarjeta') ||
     str.includes('bank')
   );
 };
 
-export const isCardSubcategory = (cat: string, sub: string, rec?: PersonalRecord | null) => {
-  if (!isBankCategory(cat)) return false;
-  if (rec && (rec.cardNumber || rec.cardCvc || rec.cardExp || rec.cardHolder || rec.cardAtmPin)) return true;
-  const str = `${cat} ${sub}`.toLowerCase();
-  return (
-    str.includes('tarjeta') ||
-    str.includes('credito') ||
-    str.includes('crédito') ||
-    str.includes('debito') ||
-    str.includes('débito') ||
-    str.includes('dreamcard') ||
-    str.includes('isracard') ||
-    str.includes('visa') ||
-    str.includes('mastercard')
-  );
+export const isCardSubcategory = (_cat: string, _sub: string, rec?: PersonalRecord | null) => {
+  // STRICT: Only true if record explicitly contains card credentials
+  if (rec && ((rec.cardNumber && rec.cardNumber.trim().length > 0) || (rec.cardCvc && rec.cardCvc.trim().length > 0) || (rec.cardAtmPin && rec.cardAtmPin.trim().length > 0))) {
+    return true;
+  }
+  return false;
 };
 
 // Quick To-Do / List Item suggestions
@@ -106,6 +93,7 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
   const [memberId, setMemberId] = useState<string>(activeMember?.id || members[0]?.id || 'member_jaime');
   const [category, setCategory] = useState<string>('');
   const [subcategory, setSubcategory] = useState<string>('');
+  const [notes, setNotes] = useState<string>('');
   const [isCustomCategory, setIsCustomCategory] = useState(false);
   const [isCustomSubcategory, setIsCustomSubcategory] = useState(false);
   const [newSubInline, setNewSubInline] = useState('');
@@ -114,7 +102,7 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
   // Content mode: 'document' (archivos/fotos) vs 'list' (listado de ítems estructurados)
   const [recordMode, setRecordMode] = useState<'document' | 'list'>('document');
 
-  // Credit Card fields (only for Banco category)
+  // Credit Card fields (only for Banco category when explicitly active)
   const [isCardMode, setIsCardMode] = useState(false);
   const [cardNumber, setCardNumber] = useState('');
   const [cardHolder, setCardHolder] = useState('');
@@ -155,6 +143,7 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
       setMemberId(editingRecord.memberId);
       setCategory(editingRecord.category || '');
       setSubcategory(editingRecord.subcategory || '');
+      setNotes(editingRecord.notes || '');
 
       // Determine initial mode
       if (editingRecord.recordType === 'list') {
@@ -207,7 +196,8 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
       const isKnownSub = catObj?.subcategories?.some((s) => s.toLowerCase() === (editingRecord.subcategory || '').toLowerCase());
       setIsCustomSubcategory(!isKnownSub && !!editingRecord.subcategory);
 
-      setIsCardMode(isCardSubcategory(editingRecord.category || '', editingRecord.subcategory || '', editingRecord));
+      const hasExistingCard = !!(editingRecord.cardNumber && editingRecord.cardNumber.trim().length > 0) || !!editingRecord.cardCvc || !!editingRecord.cardAtmPin;
+      setIsCardMode(hasExistingCard);
     } else {
       const activeId = activeMember?.id || members[0]?.id || 'member_jaime';
       setMemberId(activeId);
@@ -236,6 +226,7 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
 
       setCategory(targetCat);
       setSubcategory(targetSub);
+      setNotes('');
       setIsCustomCategory(false);
       setIsCustomSubcategory(false);
       setRecordMode('document');
@@ -254,7 +245,8 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
       setCardTheme('isracard_white');
       setCardAccountNo('');
 
-      setIsCardMode(isCardSubcategory(targetCat, targetSub));
+      // ONLY activate card mode when the user explicitly clicks the toggle switch button
+      setIsCardMode(false);
     }
     setError('');
     setShowNewSubInput(false);
@@ -279,7 +271,8 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
       const catObj = categories.find((c) => c.name === val);
       const firstSub = catObj?.subcategories?.[0] || '';
       setSubcategory(firstSub);
-      setIsCardMode(isCardSubcategory(val, firstSub));
+      // Do not auto-enable card mode on category change
+      setIsCardMode(false);
     }
   };
 
@@ -296,11 +289,7 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
 
   const handleSubcategorySelect = (subName: string) => {
     setSubcategory(subName);
-    const isCard = isCardSubcategory(category, subName);
-    setIsCardMode(isCard);
-    if (isCard && !cardHolder) {
-      setCardHolder(selectedMember?.name || 'JAIME HADIDA');
-    }
+    // Keep isCardMode as whatever the user chose with the switch button
   };
 
   const handleQuickAddSubcategory = async () => {
@@ -370,6 +359,16 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
               createdAt: new Date().toISOString(),
             });
           };
+          reader.onerror = () => {
+            resolve({
+              id: 'att_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7) + '_' + i,
+              fileName: file.name,
+              fileType: file.type || 'application/octet-stream',
+              fileSize: file.size,
+              fileDataUrl: '',
+              createdAt: new Date().toISOString(),
+            });
+          };
           reader.readAsDataURL(file);
         });
       });
@@ -385,6 +384,10 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
         if (uploaded && uploaded.length > 0) {
           setAttachments((prev) => {
             return prev.map((item) => {
+              const matchIdx = localAttachments.findIndex((la) => la.id === item.id);
+              if (matchIdx !== -1 && uploaded[matchIdx] && uploaded[matchIdx].fileUrl) {
+                return { ...item, fileUrl: uploaded[matchIdx].fileUrl };
+              }
               const matched = uploaded.find((u) => u.fileName === item.fileName);
               return matched && matched.fileUrl ? { ...item, fileUrl: matched.fileUrl } : item;
             });
@@ -393,12 +396,16 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
       } else if (onUploadFile) {
         for (let i = 0; i < fileArray.length; i++) {
           const f = fileArray[i];
+          const localItem = localAttachments[i];
           try {
             const res = await onUploadFile(f);
             if (res && res.fileUrl) {
               setAttachments((prev) => {
                 return prev.map((item) => {
-                  return item.fileName === f.name ? { ...item, fileUrl: res.fileUrl } : item;
+                  if (item.id === localItem?.id || item.fileName === f.name) {
+                    return { ...item, fileUrl: res.fileUrl };
+                  }
+                  return item;
                 });
               });
             }
@@ -514,6 +521,7 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
 
     const firstAtt = attachments[0];
     const isBank = isBankCategory(finalCategory);
+    const savingCard = isBank && isCardMode;
 
     onSave({
       id: editingRecord?.id || undefined,
@@ -521,6 +529,7 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
       category: finalCategory,
       subcategory: finalSubcategory,
       recordType: recordMode,
+      notes: notes.trim(),
       attachments: attachments,
       todos: todos,
       // Backward-compatible single file fields
@@ -529,14 +538,14 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
       fileSize: firstAtt?.fileSize || 0,
       fileUrl: firstAtt?.fileUrl || '',
       fileDataUrl: firstAtt?.fileDataUrl || '',
-      // Card fields (strictly available only for Banco category)
-      cardNumber: isBank && isCardMode ? cardNumber.trim() : undefined,
-      cardHolder: isBank && isCardMode ? cardHolder.trim().toUpperCase() : undefined,
-      cardExp: isBank && isCardMode ? cardExp.trim() : undefined,
-      cardCvc: isBank && isCardMode ? cardCvc.trim() : undefined,
-      cardAtmPin: isBank && isCardMode ? cardAtmPin.trim() : undefined,
-      cardBank: isBank && isCardMode ? cardBank.trim() : undefined,
-      cardTheme: isBank && isCardMode ? 'isracard_white' : undefined,
+      // Card fields (strictly available only when isCardMode is active)
+      cardNumber: savingCard ? cardNumber.trim() : undefined,
+      cardHolder: savingCard ? cardHolder.trim().toUpperCase() : undefined,
+      cardExp: savingCard ? cardExp.trim() : undefined,
+      cardCvc: savingCard ? cardCvc.trim() : undefined,
+      cardAtmPin: savingCard ? cardAtmPin.trim() : undefined,
+      cardBank: savingCard ? cardBank.trim() : undefined,
+      cardTheme: savingCard ? 'isracard_white' : undefined,
     });
 
     onClose();
@@ -773,33 +782,78 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
             </div>
           )}
 
-          {/* ================= CREDIT CARD VISUALIZER & INPUTS (ONLY AVAILABLE IN BANCO CATEGORY) ================= */}
+          {/* Notes / Information field (Available for all records, bank accounts, instructions) */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5 text-slate-500" />
+                <span>
+                  {subcategory.toLowerCase().includes('cuenta')
+                    ? 'Datos de la Cuenta Bancaria / Notas:'
+                    : 'Notas o Información del Dato:'}
+                </span>
+              </span>
+              <span className="text-[10px] text-slate-400 font-normal">
+                (Opcional)
+              </span>
+            </label>
+            <textarea
+              rows={2}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder={
+                subcategory.toLowerCase().includes('cuenta')
+                  ? 'Ej: Banco Galicia | Tipo: Caja de Ahorro | CBU: 00700000... | Alias: FAMILIA.HADIDA | Nº Cuenta: 4001-234567-8'
+                  : 'Escribe aquí información, notas, números de referencia o detalles...'
+              }
+              className="w-full px-3.5 py-2 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm font-medium text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-red-500/30 focus:border-red-500 resize-none"
+            />
+          </div>
+
+          {/* ================= CREDIT CARD OPTIONAL FORMAT (ACTIVATE ONLY WITH TOGGLE BUTTON) ================= */}
           {isBank && (
             <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 rounded-2xl bg-red-50/60 dark:bg-red-950/30 border border-red-200/80 dark:border-red-900/60">
-                <div className="flex items-center gap-2">
-                  <CreditCardIcon className="w-4 h-4 text-red-600" />
+              <div className="flex items-center justify-between p-3.5 rounded-2xl bg-red-50/60 dark:bg-red-950/30 border border-red-200/80 dark:border-red-900/60 transition-all">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-red-100 dark:bg-red-900/50 text-red-600 flex items-center justify-center shrink-0">
+                    <CreditCardIcon className="w-4 h-4" />
+                  </div>
                   <div>
-                    <span className="text-xs font-black text-slate-900 dark:text-white">
-                      Formato de Tarjeta Bancaria (Crédito / Débito)
+                    <span className="text-xs font-black text-slate-900 dark:text-white flex items-center gap-1.5">
+                      <span>Formato de Tarjeta Bancaria (Crédito / Débito)</span>
+                      {isCardMode ? (
+                        <span className="text-[10px] font-black px-1.5 py-0.2 rounded-md bg-red-600 text-white uppercase tracking-wider">
+                          Activo
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-md bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 uppercase">
+                          Desactivado
+                        </span>
+                      )}
                     </span>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                      Habilita visualizador, CVC, fecha de vencimiento y PIN de cajero automático
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                      {isCardMode
+                        ? 'Formato de tarjeta habilitado (visualizador, CVC, vencimiento y PIN ATM).'
+                        : 'Mueve el botón rojo para introducir datos de tarjeta de crédito.'}
                     </p>
                   </div>
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
+                  id="btn-toggle-card-mode"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     const next = !isCardMode;
                     setIsCardMode(next);
                     if (next && !cardHolder) {
                       setCardHolder(selectedMember?.name || 'JAIME HADIDA');
                     }
                   }}
-                  className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer p-0.5 ${
-                    isCardMode ? 'bg-red-600' : 'bg-slate-300 dark:bg-slate-700'
+                  className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer p-0.5 shrink-0 ${
+                    isCardMode ? 'bg-red-600 shadow-md shadow-red-600/30' : 'bg-slate-300 dark:bg-slate-700'
                   }`}
+                  title={isCardMode ? 'Desactivar formato de tarjeta' : 'Activar formato de tarjeta'}
                 >
                   <div
                     className={`w-5 h-5 rounded-full bg-white transition-transform ${
@@ -844,11 +898,10 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
-                          <span>Nombre del Banco / Tarjeta: <span className="text-red-500">*</span></span>
+                          <span>Nombre del Banco / Tarjeta:</span>
                         </label>
                         <input
                           type="text"
-                          required={isCardMode}
                           value={cardBank}
                           onChange={(e) => setCardBank(e.target.value)}
                           placeholder="Ej: ISRACARD, MAX, Visa Platinum..."
@@ -872,7 +925,7 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
 
                     <div>
                       <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
-                        <span>Número de Tarjeta: <span className="text-red-500">*</span></span>
+                        <span>Número de Tarjeta:</span>
                         <span className="text-[10px] text-slate-400 font-normal">
                           16 dígitos (Ej: 4580 9811 3659 9900)
                         </span>
@@ -880,7 +933,6 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
                       <div className="relative">
                         <input
                           type="text"
-                          required={isCardMode}
                           value={cardNumber}
                           onChange={handleCardNumberChange}
                           placeholder="4580 9811 3659 9900"
@@ -894,11 +946,10 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div>
                         <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                          Fecha Vencimiento: <span className="text-red-500">*</span>
+                          Fecha Vencimiento:
                         </label>
                         <input
                           type="text"
-                          required={isCardMode}
                           value={cardExp}
                           onChange={handleExpChange}
                           placeholder="MM/AA (05/30)"
@@ -909,11 +960,10 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
 
                       <div>
                         <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                          CVC / CVV: <span className="text-red-500">*</span>
+                          CVC / CVV:
                         </label>
                         <input
                           type="text"
-                          required={isCardMode}
                           value={cardCvc}
                           onChange={handleCvcChange}
                           placeholder="261"
@@ -1098,7 +1148,7 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
                         <div className="flex items-center justify-between gap-3">
                           <div className="flex items-center gap-2.5 min-w-0 flex-1">
                             {/* Thumbnail / Icon */}
-                            {isImg && att.fileDataUrl ? (
+                            {isImg && (att.fileDataUrl || att.fileUrl) ? (
                               <div
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1108,7 +1158,7 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
                                 title="Clic para ampliar vista previa"
                               >
                                 <img
-                                  src={att.fileDataUrl}
+                                  src={att.fileDataUrl || att.fileUrl}
                                   alt={att.fileName}
                                   className="w-full h-full object-cover"
                                   referrerPolicy="no-referrer"

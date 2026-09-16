@@ -58,7 +58,6 @@ export default function App() {
     deleteList,
     addMember,
     deleteMember,
-    resetToDefaults,
     addPersonalRecord,
     updatePersonalRecord,
     deletePersonalRecord,
