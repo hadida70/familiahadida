@@ -48,7 +48,7 @@ export const MemberProfileBar: React.FC<MemberProfileBarProps> = ({
               <span className="text-black dark:text-white font-extrabold uppercase">
                 {activeMember?.name || 'Familiar'}
               </span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/80 dark:bg-slate-900/80 font-bold opacity-90">
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/80 dark:bg-slate-900/80 font-bold opacity-90">
                 Acceso Personal
               </span>
             </div>
@@ -119,7 +119,7 @@ export const MemberProfileBar: React.FC<MemberProfileBarProps> = ({
                 <span className={`w-2.5 h-2.5 rounded-full ${theme.dot}`} />
                 <span className="text-black dark:text-white font-black">{member.name}</span>
                 {isActive && (
-                  <span className="text-[9px] px-1 py-0.2 rounded bg-blue-100 text-blue-800 font-extrabold">
+                  <span className="text-[9px] px-1 py-0.5 rounded bg-blue-100 text-blue-800 font-extrabold">
                     Filtro
                   </span>
                 )}

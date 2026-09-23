@@ -822,11 +822,11 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
                     <span className="text-xs font-black text-slate-900 dark:text-white flex items-center gap-1.5">
                       <span>Formato de Tarjeta Bancaria (Crédito / Débito)</span>
                       {isCardMode ? (
-                        <span className="text-[10px] font-black px-1.5 py-0.2 rounded-md bg-red-600 text-white uppercase tracking-wider">
+                        <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-red-600 text-white uppercase tracking-wider">
                           Activo
                         </span>
                       ) : (
-                        <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-md bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 uppercase">
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 uppercase">
                           Desactivado
                         </span>
                       )}
@@ -1176,7 +1176,7 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
                             {/* File metadata */}
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-1.5">
-                                <span className="text-[10px] font-black uppercase tracking-wider px-1.5 py-0.2 rounded-md bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 shrink-0">
+                                <span className="text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 shrink-0">
                                   #{idx + 1}
                                 </span>
                                 <p className="text-xs font-bold text-slate-900 dark:text-white truncate">

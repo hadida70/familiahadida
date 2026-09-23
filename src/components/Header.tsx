@@ -40,7 +40,7 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <Crown className="w-3.5 h-3.5 fill-amber-400 text-amber-600" />
               <span>JAIME</span>
-              <span className="text-[10px] bg-amber-500 text-white font-extrabold px-1.5 py-0.2 rounded-sm ml-0.5">
+              <span className="text-[10px] bg-amber-500 text-white font-extrabold px-1.5 py-0.5 rounded-sm ml-0.5">
                 ADMIN
               </span>
             </div>

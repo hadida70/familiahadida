@@ -217,6 +217,75 @@ export const ExcelTableViewer: React.FC<ExcelTableViewerProps> = ({
     setEditingCell(null);
   };
 
+  const saveAndNavigateCell = (direction: 'next' | 'prev' | 'down' | 'up') => {
+    if (!editingCell || !onUpdateTable) {
+      setEditingCell(null);
+      return;
+    }
+
+    const { rowIdx, colIdx } = editingCell;
+    const currentVal = rawRows[rowIdx]?.[colIdx] || '';
+    let updatedRows = rawRows;
+
+    if (currentVal !== editCellValue) {
+      updatedRows = rawRows.map((r, rIdx) => {
+        if (rIdx !== rowIdx) return r;
+        const newRow = [...r];
+        while (newRow.length < headers.length) newRow.push('');
+        newRow[colIdx] = editCellValue;
+        return newRow;
+      });
+
+      onUpdateTable({
+        headers: [...headers],
+        rows: updatedRows,
+      });
+      sounds.playCheckSound();
+    }
+
+    // Determine next target cell
+    let nextRow = rowIdx;
+    let nextCol = colIdx;
+
+    if (direction === 'next') {
+      if (colIdx + 1 < headers.length) {
+        nextCol = colIdx + 1;
+      } else {
+        // Move to first column of next row
+        nextCol = 0;
+        nextRow = rowIdx + 1;
+      }
+    } else if (direction === 'prev') {
+      if (colIdx - 1 >= 0) {
+        nextCol = colIdx - 1;
+      } else if (rowIdx - 1 >= 0) {
+        nextCol = headers.length - 1;
+        nextRow = rowIdx - 1;
+      }
+    } else if (direction === 'down') {
+      nextRow = rowIdx + 1;
+    } else if (direction === 'up') {
+      if (rowIdx - 1 >= 0) {
+        nextRow = rowIdx - 1;
+      }
+    }
+
+    // If nextRow exceeds current rows, auto-add a new empty row
+    if (nextRow >= updatedRows.length) {
+      const newEmptyRow = new Array(headers.length).fill('');
+      const extendedRows = [...updatedRows, newEmptyRow];
+      onUpdateTable({
+        headers: [...headers],
+        rows: extendedRows,
+      });
+      setEditingCell({ rowIdx: nextRow, colIdx: nextCol });
+      setEditCellValue('');
+    } else {
+      setEditingCell({ rowIdx: nextRow, colIdx: nextCol });
+      setEditCellValue(updatedRows[nextRow]?.[nextCol] || '');
+    }
+  };
+
   const cancelInlineEdit = () => {
     setEditingCell(null);
     setEditCellValue('');
@@ -331,7 +400,7 @@ export const ExcelTableViewer: React.FC<ExcelTableViewerProps> = ({
             <Filter className="w-3 h-3" />
             <span>Filtros</span>
             {Object.keys(columnFilters).length > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-white text-emerald-800 font-black">
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-white text-emerald-800 font-black">
                 {Object.keys(columnFilters).length}
               </span>
             )}
@@ -568,8 +637,12 @@ export const ExcelTableViewer: React.FC<ExcelTableViewerProps> = ({
                               onChange={(e) => setEditCellValue(e.target.value)}
                               onBlur={saveInlineEdit}
                               onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  saveInlineEdit();
+                                if (e.key === 'Tab') {
+                                  e.preventDefault();
+                                  saveAndNavigateCell(e.shiftKey ? 'prev' : 'next');
+                                } else if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  saveAndNavigateCell(e.shiftKey ? 'up' : 'down');
                                 } else if (e.key === 'Escape') {
                                   cancelInlineEdit();
                                 }

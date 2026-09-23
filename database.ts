@@ -646,6 +646,51 @@ function seedOrMigrateFromLegacy() {
     insertTodoTx(legacyData.todos);
   }
 
+  // Migrate or Seed Passwords
+  const pwdCount = db.prepare('SELECT COUNT(*) as c FROM passwords').get() as { c: number };
+  if (pwdCount.c === 0) {
+    const TABLE_PREFIX = '___EXCEL_TABLE_JSON___:';
+    const streamingTable = {
+      type: 'excel_table',
+      headers: ['Servicio / Plataforma', 'Usuario / Correo', 'Contraseña / PIN', 'Detalles / Perfil'],
+      rows: [
+        ['Netflix 4K', 'familia@hadida.com', 'Hadida2026*', 'Perfil: Principal / PIN: 1474'],
+        ['Disney+ & Star', 'familia@hadida.com', 'DisneyFam2026!', 'Disponible en Smart TVs'],
+        ['Spotify Familiar', 'musica@hadida.com', 'SpotHadida99', 'Plan Familiar 6 cuentas'],
+        ['Amazon Prime Video', 'compras@hadida.com', 'PrimeHadida!', 'Envíos y Series'],
+        ['Max (HBO)', 'familia@hadida.com', 'MaxHadida2026', 'Películas y Estrenos'],
+      ],
+    };
+    const homeAccessTable = {
+      type: 'excel_table',
+      headers: ['Dispositivo / Acceso', 'Ubicación', 'Código / PIN', 'Instrucciones'],
+      rows: [
+        ['Alarma Principal', 'Entrada Principal', '1474', 'Desactivar antes de 30 seg'],
+        ['Portón Eléctrico', 'Garaje / Estacionamiento', '8842', 'Control remoto #1 y #2'],
+        ['Cerradura Digital', 'Puerta Casa', '702026#', 'Presionar # al finalizar'],
+        ['Router WiFi 5G', 'Sala Principal', 'HadidaFiber2026', 'Red Hadida_5G'],
+      ],
+    };
+    const bankingTable = {
+      type: 'excel_table',
+      headers: ['Banco / Entidad', 'Titular', 'Nro Cuenta / Referencia', 'Tipo Cuenta', 'Notas'],
+      rows: [
+        ['Banco Principal', 'JAIME HADIDA', '0102-0001-9988-7766', 'Corriente', 'Para transferencias familiares'],
+        ['Banco Secundario', 'FAMILIA HADIDA', '0134-2233-4455-6677', 'Ahorros', 'Fondo de emergencias'],
+      ],
+    };
+
+    const insertPwd = db.prepare(`
+      INSERT OR REPLACE INTO passwords (id, website, email, password, notes, category, member_id, color, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    insertPwd.run('pwd_streaming', 'Cuentas de Streaming Familiar', '', '', TABLE_PREFIX + JSON.stringify(streamingTable), 'Streaming', 'all', 'green', new Date().toISOString(), new Date().toISOString());
+    insertPwd.run('pwd_accesos_hogar', 'Accesos y Códigos del Hogar', '', '', TABLE_PREFIX + JSON.stringify(homeAccessTable), 'Hogar', 'all', 'blue', new Date().toISOString(), new Date().toISOString());
+    insertPwd.run('pwd_wifi', 'WiFi Red Principal (Hadida_5G)', '', '', '📶 Red: Hadida_Fiber_5G\n🔑 Clave: HadidaFamily2026!\n📌 Ubicación del Router: Sala de estar\n\nRed Invitados: Hadida_Guest (Sin clave)', 'Hogar', 'all', 'yellow', new Date().toISOString(), new Date().toISOString());
+    insertPwd.run('pwd_bancos', 'Cuentas Bancarias y Referencias', '', '', TABLE_PREFIX + JSON.stringify(bankingTable), 'Finanzas', 'member_jaime', 'purple', new Date().toISOString(), new Date().toISOString());
+  }
+
   console.log('✅ Base de datos SQLite inicializada y migrada con éxito.');
 }
 

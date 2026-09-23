@@ -264,7 +264,7 @@ export const PhotoLightboxModal: React.FC<PhotoLightboxModalProps> = ({
                     </div>
                   )}
                   {att.label && (
-                    <span className="absolute bottom-0 inset-x-0 bg-black/80 text-[8px] font-black text-white text-center truncate py-0.2 px-0.5">
+                    <span className="absolute bottom-0 inset-x-0 bg-black/80 text-[8px] font-black text-white text-center truncate py-0.5 px-0.5">
                       {att.label}
                     </span>
                   )}

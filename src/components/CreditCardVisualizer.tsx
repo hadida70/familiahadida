@@ -86,7 +86,7 @@ export const CreditCardVisualizer: React.FC<CreditCardVisualizerProps> = ({
           </span>
           <div className="flex items-center gap-1.5">
             {cardAtmPin && (
-              <span className="text-[9px] font-black px-1.5 py-0.2 rounded-md bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 uppercase tracking-wider">
+              <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 uppercase tracking-wider">
                 ATM PIN
               </span>
             )}

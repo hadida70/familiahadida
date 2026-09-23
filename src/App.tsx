@@ -375,7 +375,7 @@ export default function App() {
               <span>CALENDARIO</span>
               {totalTasks > 0 && (
                 <span
-                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
                     activeTab === 'calendar'
                       ? 'bg-red-50 text-red-600 border border-red-200'
                       : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
@@ -399,7 +399,7 @@ export default function App() {
               <span>LISTAS</span>
               {totalItems > 0 && (
                 <span
-                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
                     activeTab === 'lists'
                       ? 'bg-red-50 text-red-600 border border-red-200'
                       : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
@@ -423,7 +423,7 @@ export default function App() {
               <span>DATOS</span>
               {totalPersonalRecords > 0 && (
                 <span
-                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
                     activeTab === 'personal_data'
                       ? 'bg-red-50 text-red-600 border border-red-200'
                       : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
@@ -447,7 +447,7 @@ export default function App() {
               <span>CONTACTOS</span>
               {totalContacts > 0 && (
                 <span
-                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
                     activeTab === 'contacts'
                       ? 'bg-red-50 text-red-600 border border-red-200'
                       : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
@@ -471,7 +471,7 @@ export default function App() {
               <span>TO-DO</span>
               {pendingTodos > 0 && (
                 <span
-                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
                     activeTab === 'todos'
                       ? 'bg-red-50 text-red-600 border border-red-200'
                       : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
@@ -495,7 +495,7 @@ export default function App() {
               <span>CLAVES</span>
               {totalPasswords > 0 && (
                 <span
-                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
                     activeTab === 'passwords'
                       ? 'bg-amber-600 text-white'
                       : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'

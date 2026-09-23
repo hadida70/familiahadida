@@ -795,7 +795,7 @@ export const ManageDataCategoriesModal: React.FC<ManageDataCategoriesModalProps>
 
                             {count > 0 && (
                               <span
-                                className="text-[10px] px-1.5 py-0.2 rounded-full bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300 font-extrabold"
+                                className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300 font-extrabold"
                                 title={`${count} documento(s) con esta subcategoría`}
                               >
                                 {count}

@@ -438,7 +438,7 @@ export const PasswordsView: React.FC<PasswordsViewProps> = ({
   // Export all passwords to XLSX
   const handleExportAllToXLSX = () => {
     const tableData: ExcelTableData = {
-      headers: ['Título / Servicio', 'Tipo', 'Contenido / Datos', 'Asignado a'],
+      headers: ['Título / Servicio', 'Categoría', 'Usuario / Correo', 'Contraseña / PIN', 'Notas / Contenido', 'Tipo', 'Asignado a', 'Fecha'],
       rows: filteredPasswords.map((p) => {
         const isTab = isTableContent(p.notes);
         const owner = getOwnerBadge(p.memberId).label;
@@ -449,7 +449,16 @@ export const PasswordsView: React.FC<PasswordsViewProps> = ({
             content = `[Tabla: ${parsed.headers.join(' | ')}]`;
           }
         }
-        return [p.website || 'Clave', isTab ? 'Tabla Excel' : 'Texto Libre', content, owner];
+        return [
+          p.website || 'Clave',
+          p.category || 'General',
+          p.email || '',
+          p.password || '',
+          content,
+          isTab ? 'Tabla Excel' : 'Texto Libre',
+          owner,
+          p.createdAt ? new Date(p.createdAt).toLocaleDateString() : '',
+        ];
       }),
     };
     exportTableToXLSX('catalogo_claves', tableData);
@@ -459,11 +468,20 @@ export const PasswordsView: React.FC<PasswordsViewProps> = ({
   // Export all passwords to CSV
   const handleExportAllToCSV = () => {
     const tableData: ExcelTableData = {
-      headers: ['Título / Servicio', 'Tipo', 'Contenido / Datos', 'Asignado a'],
+      headers: ['Título / Servicio', 'Categoría', 'Usuario / Correo', 'Contraseña / PIN', 'Notas / Contenido', 'Tipo', 'Asignado a', 'Fecha'],
       rows: filteredPasswords.map((p) => {
         const isTab = isTableContent(p.notes);
         const owner = getOwnerBadge(p.memberId).label;
-        return [p.website || 'Clave', isTab ? 'Tabla Excel' : 'Texto Libre', p.notes || '', owner];
+        return [
+          p.website || 'Clave',
+          p.category || 'General',
+          p.email || '',
+          p.password || '',
+          p.notes || '',
+          isTab ? 'Tabla Excel' : 'Texto Libre',
+          owner,
+          p.createdAt ? new Date(p.createdAt).toLocaleDateString() : '',
+        ];
       }),
     };
     exportTableToCSV('catalogo_claves', tableData);
@@ -1433,7 +1451,12 @@ export const PasswordsView: React.FC<PasswordsViewProps> = ({
                       if (isTable && parsedTable) {
                         full = tableToTSV(parsedTable);
                       } else {
-                        full = `${item.website ? `🔑 ${item.website}\n\n` : ''}${item.notes || ''}`.trim();
+                        const parts: string[] = [];
+                        if (item.website) parts.push(`🔑 ${item.website}`);
+                        if (item.email) parts.push(`👤 Usuario: ${item.email}`);
+                        if (item.password) parts.push(`🔒 Contraseña: ${item.password}`);
+                        if (item.notes) parts.push(`📝 ${item.notes}`);
+                        full = parts.join('\n\n').trim() || item.website || '';
                       }
                       handleCopy(full, `note_${item.id}`);
                     }}

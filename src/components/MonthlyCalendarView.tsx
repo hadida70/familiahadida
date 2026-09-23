@@ -362,7 +362,7 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
                   </span>
 
                   {day.tasks.length > 0 && (
-                    <span className="text-[10px] font-extrabold px-1.5 py-0.2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                    <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                       {day.tasks.length}
                     </span>
                   )}

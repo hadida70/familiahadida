@@ -95,6 +95,41 @@ export const ExcelTableEditor: React.FC<ExcelTableEditorProps> = ({
     sounds.playDeleteSound();
   };
 
+  // Keyboard navigation for spreadsheet editor
+  const handleCellKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, rowIdx: number, colIdx: number) => {
+    if (e.key === 'Tab') {
+      if (!e.shiftKey && rowIdx === rows.length - 1 && colIdx === headers.length - 1) {
+        e.preventDefault();
+        handleAddRow();
+        setTimeout(() => {
+          const nextInput = document.querySelector<HTMLInputElement>(`input[data-cell="${rowIdx + 1}-0"]`);
+          nextInput?.focus();
+          nextInput?.select();
+        }, 50);
+      }
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (e.shiftKey) {
+        const prevInput = document.querySelector<HTMLInputElement>(`input[data-cell="${rowIdx - 1}-${colIdx}"]`);
+        prevInput?.focus();
+        prevInput?.select();
+      } else {
+        if (rowIdx === rows.length - 1) {
+          handleAddRow();
+          setTimeout(() => {
+            const nextInput = document.querySelector<HTMLInputElement>(`input[data-cell="${rowIdx + 1}-${colIdx}"]`);
+            nextInput?.focus();
+            nextInput?.select();
+          }, 50);
+        } else {
+          const nextInput = document.querySelector<HTMLInputElement>(`input[data-cell="${rowIdx + 1}-${colIdx}"]`);
+          nextInput?.focus();
+          nextInput?.select();
+        }
+      }
+    }
+  };
+
   // Clear all cell values
   const handleClearAll = () => {
     if (window.confirm('¿Deseas limpiar todos los datos de la tabla?')) {
@@ -338,16 +373,10 @@ export const ExcelTableEditor: React.FC<ExcelTableEditorProps> = ({
                     >
                       <input
                         type="text"
+                        data-cell={`${rowIdx}-${colIdx}`}
                         value={row[colIdx] || ''}
                         onChange={(e) => handleCellChange(rowIdx, colIdx, e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            // If on last row, auto add row
-                            if (rowIdx === rows.length - 1 && colIdx === headers.length - 1) {
-                              handleAddRow();
-                            }
-                          }
-                        }}
+                        onKeyDown={(e) => handleCellKeyDown(e, rowIdx, colIdx)}
                         placeholder="..."
                         className="w-full px-2.5 py-1.5 text-xs bg-transparent text-slate-900 dark:text-white rounded-lg outline-none focus:bg-white dark:focus:bg-slate-800 focus:ring-1.5 focus:ring-emerald-500 border border-transparent focus:border-emerald-500 transition-all font-sans"
                       />

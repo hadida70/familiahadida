@@ -355,7 +355,7 @@ export const SendPersonalRecordModal: React.FC<SendPersonalRecordModalProps> = (
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             {att.label && (
-                              <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded-md bg-red-600 text-white shrink-0">
+                              <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md bg-red-600 text-white shrink-0">
                                 {att.label}
                               </span>
                             )}
