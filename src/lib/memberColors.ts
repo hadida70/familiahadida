@@ -200,3 +200,19 @@ export function getMemberColorTheme(member?: Member | null, memberId?: string): 
 
   return PALETTE[9];
 }
+
+export function getMemberPostitColor(member?: Member | null, memberId?: string): string {
+  const theme = getMemberColorTheme(member, memberId);
+  const name = theme.name.toLowerCase();
+  if (name.includes('naranja') || name.includes('orange')) return 'orange';
+  if (name.includes('azul') || name.includes('blue')) return 'blue';
+  if (name.includes('rojo') || name.includes('red')) return 'red';
+  if (name.includes('morado') || name.includes('purple')) return 'purple';
+  if (name.includes('rosa') || name.includes('pink')) return 'pink';
+  if (name.includes('fucsia') || name.includes('rose')) return 'rose';
+  if (name.includes('ámbar') || name.includes('amarillo') || name.includes('amber') || name.includes('yellow')) return 'yellow';
+  if (name.includes('verde') || name.includes('esmeralda') || name.includes('emerald') || name.includes('green')) return 'green';
+  if (name.includes('índigo') || name.includes('indigo') || name.includes('teal') || name.includes('turquesa')) return 'blue';
+  return 'yellow';
+}
+

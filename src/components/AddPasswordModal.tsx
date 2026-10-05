@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { Member, PasswordItem } from '../types';
 import { sounds } from '../lib/sound';
+import { getMemberPostitColor } from '../lib/memberColors';
 import { ExcelTableEditor } from './ExcelTableEditor';
 import {
   ExcelTableData,
@@ -45,18 +46,11 @@ const POSTIT_COLORS = [
     ringClass: 'ring-amber-400',
   },
   {
-    id: 'pink',
-    name: 'Rosa Pastel',
-    bgClass: 'bg-pink-100 border-pink-300 text-pink-900',
-    swatchClass: 'bg-pink-300 border-pink-400',
-    ringClass: 'ring-pink-400',
-  },
-  {
-    id: 'green',
-    name: 'Verde Menta',
-    bgClass: 'bg-emerald-100 border-emerald-300 text-emerald-900',
-    swatchClass: 'bg-emerald-300 border-emerald-400',
-    ringClass: 'ring-emerald-400',
+    id: 'orange',
+    name: 'Naranja Cálido',
+    bgClass: 'bg-orange-100 border-orange-300 text-orange-900',
+    swatchClass: 'bg-orange-300 border-orange-400',
+    ringClass: 'ring-orange-400',
   },
   {
     id: 'blue',
@@ -66,6 +60,13 @@ const POSTIT_COLORS = [
     ringClass: 'ring-sky-400',
   },
   {
+    id: 'red',
+    name: 'Rojo',
+    bgClass: 'bg-red-100 border-red-300 text-red-900',
+    swatchClass: 'bg-red-400 border-red-500',
+    ringClass: 'ring-red-400',
+  },
+  {
     id: 'purple',
     name: 'Lavanda',
     bgClass: 'bg-purple-100 border-purple-300 text-purple-900',
@@ -73,11 +74,25 @@ const POSTIT_COLORS = [
     ringClass: 'ring-purple-400',
   },
   {
-    id: 'orange',
-    name: 'Naranja Cálido',
-    bgClass: 'bg-orange-100 border-orange-300 text-orange-900',
-    swatchClass: 'bg-orange-300 border-orange-400',
-    ringClass: 'ring-orange-400',
+    id: 'pink',
+    name: 'Rosa Pastel',
+    bgClass: 'bg-pink-100 border-pink-300 text-pink-900',
+    swatchClass: 'bg-pink-300 border-pink-400',
+    ringClass: 'ring-pink-400',
+  },
+  {
+    id: 'rose',
+    name: 'Fucsia',
+    bgClass: 'bg-rose-100 border-rose-300 text-rose-900',
+    swatchClass: 'bg-rose-400 border-rose-500',
+    ringClass: 'ring-rose-400',
+  },
+  {
+    id: 'green',
+    name: 'Verde Menta',
+    bgClass: 'bg-emerald-100 border-emerald-300 text-emerald-900',
+    swatchClass: 'bg-emerald-300 border-emerald-400',
+    ringClass: 'ring-emerald-400',
   },
 ];
 
@@ -130,9 +145,11 @@ export const AddPasswordModal: React.FC<AddPasswordModalProps> = ({
       setNotes('');
       setMode('text');
       setTableData(TABLE_TEMPLATES[0].table);
-      setMemberId(activeMember?.id || 'all');
+      const defaultMid = activeMember?.id || 'all';
+      setMemberId(defaultMid);
       setCategory('General');
-      setColor('yellow');
+      const defaultColor = defaultMid !== 'all' ? getMemberPostitColor(activeMember, defaultMid) : 'yellow';
+      setColor(defaultColor);
       setShowPassword(true);
       setShowExtraCredentials(true);
     }
@@ -260,7 +277,14 @@ export const AddPasswordModal: React.FC<AddPasswordModalProps> = ({
             </label>
             <select
               value={memberId}
-              onChange={(e) => setMemberId(e.target.value)}
+              onChange={(e) => {
+                const mid = e.target.value;
+                setMemberId(mid);
+                if (mid !== 'all') {
+                  const mObj = members.find((m) => m.id === mid);
+                  setColor(getMemberPostitColor(mObj, mid));
+                }
+              }}
               className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs sm:text-sm font-medium outline-none focus:ring-2 focus:ring-amber-500/30 cursor-pointer"
             >
               <option value="all">👥 Toda la Familia (Clave Compartida)</option>

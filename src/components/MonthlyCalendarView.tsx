@@ -14,6 +14,7 @@ import {
   Search,
 } from 'lucide-react';
 import { CalendarTask, Member } from '../types';
+import { getMemberColorTheme } from '../lib/memberColors';
 
 interface MonthlyCalendarViewProps {
   tasks: CalendarTask[];
@@ -268,16 +269,18 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
             </button>
             {members.map((m) => {
               const isSelected = selectedMemberFilter === m.id;
+              const mTheme = getMemberColorTheme(m, m.id);
               return (
                 <button
                   key={m.id}
                   onClick={() => setSelectedMemberFilter(isSelected ? 'all' : m.id)}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 border cursor-pointer ${
                     isSelected
-                      ? 'bg-white dark:bg-slate-900 text-red-600 border-red-600 shadow-2xs ring-1 ring-red-500/20 font-black'
-                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border-red-200 dark:border-red-950 hover:border-red-500'
+                      ? `${mTheme.badge} shadow-2xs ring-2 ring-offset-1 font-black`
+                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-slate-400'
                   }`}
                 >
+                  <span className={`w-2 h-2 rounded-full ${mTheme.dot}`} />
                   <span className="font-extrabold">{m.name}</span>
                 </button>
               );
@@ -368,21 +371,23 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
                   )}
                 </div>
 
-                {/* Desktop: Task Pills in white with red accent */}
+                {/* Desktop: Task Pills with Member Unique Colors */}
                 <div className="hidden sm:block space-y-1 my-1 overflow-hidden max-h-[46px]">
                   {day.tasks.slice(0, 2).map((t) => {
                     const assignee = members.find((m) => m.id === t.assignedToId);
+                    const mTheme = getMemberColorTheme(assignee, t.assignedToId);
 
                     return (
                       <div
                         key={t.id}
-                        className="text-[10px] px-1.5 py-0.5 rounded truncate font-medium bg-white dark:bg-slate-900 border border-red-200 dark:border-red-900/60 shadow-2xs"
+                        className={`text-[10px] px-1.5 py-0.5 rounded truncate font-medium bg-white dark:bg-slate-900 border ${mTheme.border} shadow-2xs flex items-center gap-1`}
                         title={`${assignee ? assignee.name + ': ' : ''}${t.title}`}
                       >
-                        <span className="font-extrabold mr-1 text-red-600 dark:text-red-400">
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${mTheme.dot}`} />
+                        <span className="font-black shrink-0">
                           {assignee ? assignee.name : 'Familia'}:
                         </span>
-                        <span className={t.completed ? 'line-through opacity-60 text-slate-500' : 'text-slate-800 dark:text-slate-200'}>
+                        <span className={`truncate ${t.completed ? 'line-through opacity-60 text-slate-500' : 'text-slate-800 dark:text-slate-200'}`}>
                           {t.title}
                         </span>
                       </div>
@@ -395,14 +400,19 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
                   )}
                 </div>
 
-                {/* Mobile: Red dots */}
+                {/* Mobile: Colored dots per member */}
                 <div className="flex sm:hidden items-center gap-1 mt-1 justify-end flex-wrap">
-                  {day.tasks.slice(0, 4).map((t) => (
-                    <span
-                      key={t.id}
-                      className="w-2 h-2 rounded-full bg-red-500"
-                    />
-                  ))}
+                  {day.tasks.slice(0, 5).map((t) => {
+                    const assignee = members.find((m) => m.id === t.assignedToId);
+                    const mTheme = getMemberColorTheme(assignee, t.assignedToId);
+                    return (
+                      <span
+                        key={t.id}
+                        className={`w-2 h-2 rounded-full shadow-2xs ${mTheme.dot}`}
+                        title={assignee ? assignee.name : 'Familia'}
+                      />
+                    );
+                  })}
                 </div>
               </div>
             );
@@ -534,11 +544,12 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
                           <span>Día: {task.date}</span>
                         </span>
 
-                        {/* Nombre Integrante: Fondo blanco borde rojo */}
+                        {/* Nombre Integrante con su color distintivo */}
                         <span
-                          className="inline-flex items-center px-2.5 py-0.5 rounded-lg text-[11px] font-extrabold bg-white dark:bg-slate-900 text-red-600 dark:text-red-400 border border-red-600 dark:border-red-500 shadow-2xs"
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-[11px] font-black border shadow-2xs ${getMemberColorTheme(assignee, task.assignedToId).badge}`}
                         >
-                          <span>{assignee ? assignee.name : 'Sin Asignar'}</span>
+                          <span className={`w-2 h-2 rounded-full ${getMemberColorTheme(assignee, task.assignedToId).dot}`} />
+                          <span>{assignee ? assignee.name : 'Toda la Familia'}</span>
                         </span>
                       </div>
 

@@ -25,6 +25,7 @@ import { Member, PersonalRecord, DataCategory, PasswordItem } from '../types';
 import { PersonalRecordCard } from './PersonalRecordCard';
 import { ExcelTableViewer } from './ExcelTableViewer';
 import { sounds } from '../lib/sound';
+import { getMemberPostitColor } from '../lib/memberColors';
 import {
   isTableContent,
   parseTableContent,
@@ -65,22 +66,13 @@ const POSTIT_COLORS = [
     dotClass: 'bg-amber-400 border-amber-500',
   },
   {
-    id: 'pink',
-    name: 'Rosa',
-    card: 'bg-pink-100/95 dark:bg-pink-950/80 border-pink-300/80 dark:border-pink-700/60 text-pink-950 dark:text-pink-100 shadow-md shadow-pink-900/5',
-    tape: 'bg-pink-300/70 dark:bg-pink-600/40 border border-pink-400/40',
-    badge: 'bg-pink-200/90 dark:bg-pink-900/80 text-pink-950 dark:text-pink-200 border-pink-300/80',
-    actionHover: 'hover:bg-pink-200/90 dark:hover:bg-pink-900/70 text-pink-900 dark:text-pink-200',
-    dotClass: 'bg-pink-400 border-pink-500',
-  },
-  {
-    id: 'green',
-    name: 'Verde',
-    card: 'bg-emerald-100/95 dark:bg-emerald-950/80 border-emerald-300/80 dark:border-emerald-700/60 text-emerald-950 dark:text-emerald-100 shadow-md shadow-emerald-900/5',
-    tape: 'bg-emerald-300/70 dark:bg-emerald-600/40 border border-emerald-400/40',
-    badge: 'bg-emerald-200/90 dark:bg-emerald-900/80 text-emerald-950 dark:text-emerald-200 border-emerald-300/80',
-    actionHover: 'hover:bg-emerald-200/90 dark:hover:bg-emerald-900/70 text-emerald-900 dark:text-emerald-200',
-    dotClass: 'bg-emerald-400 border-emerald-500',
+    id: 'orange',
+    name: 'Naranja',
+    card: 'bg-orange-100/95 dark:bg-orange-950/80 border-orange-300/80 dark:border-orange-700/60 text-orange-950 dark:text-orange-100 shadow-md shadow-orange-900/5',
+    tape: 'bg-orange-300/70 dark:bg-orange-600/40 border border-orange-400/40',
+    badge: 'bg-orange-200/90 dark:bg-orange-900/80 text-orange-950 dark:text-orange-200 border-orange-300/80',
+    actionHover: 'hover:bg-orange-200/90 dark:hover:bg-orange-900/70 text-orange-900 dark:text-orange-200',
+    dotClass: 'bg-orange-400 border-orange-500',
   },
   {
     id: 'blue',
@@ -92,8 +84,17 @@ const POSTIT_COLORS = [
     dotClass: 'bg-sky-400 border-sky-500',
   },
   {
+    id: 'red',
+    name: 'Rojo',
+    card: 'bg-red-100/95 dark:bg-red-950/80 border-red-300/80 dark:border-red-700/60 text-red-950 dark:text-red-100 shadow-md shadow-red-900/5',
+    tape: 'bg-red-300/70 dark:bg-red-600/40 border border-red-400/40',
+    badge: 'bg-red-200/90 dark:bg-red-900/80 text-red-950 dark:text-red-200 border-red-300/80',
+    actionHover: 'hover:bg-red-200/90 dark:hover:bg-red-900/70 text-red-900 dark:text-red-200',
+    dotClass: 'bg-red-500 border-red-600',
+  },
+  {
     id: 'purple',
-    name: 'Lavanda',
+    name: 'Morado / Lavanda',
     card: 'bg-purple-100/95 dark:bg-purple-950/80 border-purple-300/80 dark:border-purple-700/60 text-purple-950 dark:text-purple-100 shadow-md shadow-purple-900/5',
     tape: 'bg-purple-300/70 dark:bg-purple-600/40 border border-purple-400/40',
     badge: 'bg-purple-200/90 dark:bg-purple-900/80 text-purple-950 dark:text-purple-200 border-purple-300/80',
@@ -101,13 +102,31 @@ const POSTIT_COLORS = [
     dotClass: 'bg-purple-400 border-purple-500',
   },
   {
-    id: 'orange',
-    name: 'Naranja',
-    card: 'bg-orange-100/95 dark:bg-orange-950/80 border-orange-300/80 dark:border-orange-700/60 text-orange-950 dark:text-orange-100 shadow-md shadow-orange-900/5',
-    tape: 'bg-orange-300/70 dark:bg-orange-600/40 border border-orange-400/40',
-    badge: 'bg-orange-200/90 dark:bg-orange-900/80 text-orange-950 dark:text-orange-200 border-orange-300/80',
-    actionHover: 'hover:bg-orange-200/90 dark:hover:bg-orange-900/70 text-orange-900 dark:text-orange-200',
-    dotClass: 'bg-orange-400 border-orange-500',
+    id: 'pink',
+    name: 'Rosa',
+    card: 'bg-pink-100/95 dark:bg-pink-950/80 border-pink-300/80 dark:border-pink-700/60 text-pink-950 dark:text-pink-100 shadow-md shadow-pink-900/5',
+    tape: 'bg-pink-300/70 dark:bg-pink-600/40 border border-pink-400/40',
+    badge: 'bg-pink-200/90 dark:bg-pink-900/80 text-pink-950 dark:text-pink-200 border-pink-300/80',
+    actionHover: 'hover:bg-pink-200/90 dark:hover:bg-pink-900/70 text-pink-900 dark:text-pink-200',
+    dotClass: 'bg-pink-400 border-pink-500',
+  },
+  {
+    id: 'rose',
+    name: 'Fucsia',
+    card: 'bg-rose-100/95 dark:bg-rose-950/80 border-rose-300/80 dark:border-rose-700/60 text-rose-950 dark:text-rose-100 shadow-md shadow-rose-900/5',
+    tape: 'bg-rose-300/70 dark:bg-rose-600/40 border border-rose-400/40',
+    badge: 'bg-rose-200/90 dark:bg-rose-900/80 text-rose-950 dark:text-rose-200 border-rose-300/80',
+    actionHover: 'hover:bg-rose-200/90 dark:hover:bg-rose-900/70 text-rose-900 dark:text-rose-200',
+    dotClass: 'bg-rose-500 border-rose-600',
+  },
+  {
+    id: 'green',
+    name: 'Verde / Esmeralda',
+    card: 'bg-emerald-100/95 dark:bg-emerald-950/80 border-emerald-300/80 dark:border-emerald-700/60 text-emerald-950 dark:text-emerald-100 shadow-md shadow-emerald-900/5',
+    tape: 'bg-emerald-300/70 dark:bg-emerald-600/40 border border-emerald-400/40',
+    badge: 'bg-emerald-200/90 dark:bg-emerald-900/80 text-emerald-950 dark:text-emerald-200 border-emerald-300/80',
+    actionHover: 'hover:bg-emerald-200/90 dark:hover:bg-emerald-900/70 text-emerald-900 dark:text-emerald-200',
+    dotClass: 'bg-emerald-400 border-emerald-500',
   },
 ];
 
@@ -1007,7 +1026,14 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
 
                             <select
                               value={newNoteMemberId}
-                              onChange={(e) => setNewNoteMemberId(e.target.value)}
+                              onChange={(e) => {
+                                const mid = e.target.value;
+                                setNewNoteMemberId(mid);
+                                if (mid !== 'all') {
+                                  const mObj = members.find((m) => m.id === mid);
+                                  setNewNoteColor(getMemberPostitColor(mObj, mid));
+                                }
+                              }}
                               className="text-[11px] font-bold bg-white/70 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-lg px-1.5 py-0.5 outline-none cursor-pointer"
                             >
                               <option value="all">👥 Familia</option>
@@ -1071,8 +1097,11 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
                     {/* Existing Notes */}
                     {filteredNotes.map((note) => {
                       const isEditing = editingNoteId === note.id;
-                      const colorKey = note.color && THEMES_MAP[note.color] ? note.color : 'yellow';
-                      const theme = THEMES_MAP[colorKey];
+                      const memberColor = note.memberId && note.memberId !== 'all'
+                        ? getMemberPostitColor(members.find((m) => m.id === note.memberId), note.memberId)
+                        : (note.color || 'yellow');
+                      const colorKey = THEMES_MAP[memberColor] ? memberColor : (THEMES_MAP[note.color || ''] ? note.color! : 'yellow');
+                      const theme = THEMES_MAP[colorKey] || THEMES_MAP.yellow;
                       const ownerBadge = getOwnerBadge(note.memberId);
                       const isCopied = copiedNoteId === `datos_note_${note.id}`;
                       const webUrl = formatWebsiteUrl(note.website);
@@ -1106,7 +1135,14 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
 
                                 <select
                                   value={editNoteMemberId}
-                                  onChange={(e) => setEditNoteMemberId(e.target.value)}
+                                  onChange={(e) => {
+                                    const mid = e.target.value;
+                                    setEditNoteMemberId(mid);
+                                    if (mid !== 'all') {
+                                      const mObj = members.find((m) => m.id === mid);
+                                      setEditNoteColor(getMemberPostitColor(mObj, mid));
+                                    }
+                                  }}
                                   className="text-[11px] font-bold bg-white/70 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-lg px-1.5 py-0.5 outline-none cursor-pointer"
                                 >
                                   <option value="all">👥 Familia</option>
