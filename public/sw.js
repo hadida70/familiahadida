@@ -1,4 +1,4 @@
-const CACHE_NAME = 'familiahadida-pwa-v16';
+const CACHE_NAME = 'familiahadida-pwa-v17';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -25,11 +25,20 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         cacheNames
           .filter((name) => name !== CACHE_NAME)
-          .map((name) => caches.delete(name))
+          .map((name) => {
+            console.log('Clearing old PWA cache:', name);
+            return caches.delete(name);
+          })
       );
     })
   );
   self.clients.claim();
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data && (event.data.type === 'SKIP_WAITING' || event.data === 'skipWaiting')) {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('fetch', (event) => {
@@ -43,6 +52,32 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  const isNavigation = event.request.mode === 'navigate' || event.request.destination === 'document';
+
+  if (isNavigation) {
+    // Network-First for HTML/Navigation: Always fetch fresh HTML when online
+    event.respondWith(
+      fetch(event.request, { cache: 'no-cache' })
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseClone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseClone);
+              cache.put('/index.html', networkResponse.clone());
+            });
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          return caches.match(event.request).then((cachedResponse) => {
+            return cachedResponse || caches.match('/index.html') || new Response('Offline', { status: 503, statusText: 'Offline' });
+          });
+        })
+    );
+    return;
+  }
+
+  // For static assets (JS, CSS, images): Network-first with cache fallback
   event.respondWith(
     fetch(event.request)
       .then((networkResponse) => {
@@ -58,9 +93,6 @@ self.addEventListener('fetch', (event) => {
         return caches.match(event.request).then((cachedResponse) => {
           if (cachedResponse) {
             return cachedResponse;
-          }
-          if (event.request.mode === 'navigate') {
-            return caches.match('/index.html');
           }
           return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
         });

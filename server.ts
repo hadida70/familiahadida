@@ -1193,7 +1193,11 @@ async function startServer() {
     app.use(
       express.static(distPath, {
         setHeaders: (res, filePath) => {
-          if (filePath.endsWith('index.html') || filePath.endsWith('sw.js')) {
+          if (
+            filePath.endsWith('index.html') ||
+            filePath.endsWith('sw.js') ||
+            filePath.endsWith('manifest.webmanifest')
+          ) {
             res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
             res.setHeader('Pragma', 'no-cache');
             res.setHeader('Expires', '0');
