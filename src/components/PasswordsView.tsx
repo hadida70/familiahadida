@@ -1374,26 +1374,15 @@ export const PasswordsView: React.FC<PasswordsViewProps> = ({
                   className={`w-24 h-4 mx-auto -mt-7 mb-3 rounded-xs backdrop-blur-md opacity-85 rotate-[-0.5deg] shadow-2xs ${theme.tape}`}
                 />
 
-                {/* Top Bar: Owner Badge & Type Badge */}
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <div
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-black border backdrop-blur-xs ${theme.badge}`}
-                  >
-                    {ownerBadge.isAll ? (
-                      <Users className="w-3 h-3" />
-                    ) : (
-                      <span className={`w-2 h-2 rounded-full ${ownerBadge.avatarColor}`} />
-                    )}
-                    <span>{ownerBadge.label}</span>
-                  </div>
-
-                  {isTable && (
+                {/* Top Bar: Excel Type Badge if applicable */}
+                {isTable && (
+                  <div className="flex items-center justify-end gap-2 mb-2">
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-300/60 dark:border-emerald-800">
                       <FileSpreadsheet className="w-3 h-3" />
                       <span>Excel</span>
                     </span>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 {/* Card Body: Title & Content */}
                 <div className="space-y-2.5 flex-1">

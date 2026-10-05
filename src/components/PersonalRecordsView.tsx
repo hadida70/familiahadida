@@ -137,7 +137,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
 }) => {
   const [selectedMemberId, setSelectedMemberId] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
 
   // In-line note creation & editing state inside Datos
@@ -172,6 +172,12 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
 
   const handleCategoryChange = (catName: string) => {
     setSelectedCategory(catName);
+    if (catName !== 'all') {
+      setExpandedCategories((prev) => ({
+        ...prev,
+        [catName]: true,
+      }));
+    }
   };
 
   // Filtered passwords/notes for the selected member
@@ -288,24 +294,24 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
     return result;
   }, [filteredRecords, categories, selectedCategory]);
 
-  const toggleCategoryCollapse = (catName: string) => {
-    setCollapsedCategories((prev) => ({
+  const toggleCategoryExpand = (catName: string) => {
+    setExpandedCategories((prev) => ({
       ...prev,
       [catName]: !prev[catName],
     }));
   };
 
   const collapseAll = () => {
-    const allCollapsed: Record<string, boolean> = {};
-    groupedCategories.forEach((g) => {
-      allCollapsed[g.categoryName] = true;
-    });
-    allCollapsed['notas_claves'] = true;
-    setCollapsedCategories(allCollapsed);
+    setExpandedCategories({});
   };
 
   const expandAll = () => {
-    setCollapsedCategories({});
+    const allExpanded: Record<string, boolean> = {};
+    groupedCategories.forEach((g) => {
+      allExpanded[g.categoryName] = true;
+    });
+    allExpanded['notas_claves'] = true;
+    setExpandedCategories(allExpanded);
   };
 
   // Note copy helper
@@ -448,7 +454,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
                     setNewNoteColor('yellow');
                     setNewNoteTitle('');
                     setNewNoteText('');
-                    setCollapsedCategories((prev) => ({ ...prev, notas_claves: false }));
+                    setExpandedCategories((prev) => ({ ...prev, notas_claves: true }));
                   }}
                   className="w-full py-2 px-3 rounded-2xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black flex items-center justify-center gap-1.5 shadow-2xs border border-amber-600 cursor-pointer transition-all active:scale-98"
                 >
@@ -725,57 +731,18 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
           <button
             type="button"
             onClick={() => setIsMobileDrawerOpen(true)}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700/80 text-slate-800 dark:text-slate-100 font-extrabold text-xs transition-all cursor-pointer active:scale-95 border border-slate-200/80 dark:border-slate-700 shadow-2xs"
+            className="w-full flex items-center justify-between gap-2 px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700/80 text-slate-800 dark:text-slate-100 font-extrabold text-xs transition-all cursor-pointer active:scale-98 border border-slate-200/80 dark:border-slate-700 shadow-2xs"
           >
-            <Menu className="w-4 h-4 text-red-600 stroke-[2.5]" />
-            <span>Filtros & Categorías</span>
-            {(selectedMemberId !== 'all' || selectedCategory !== 'all') && (
-              <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
+            <div className="flex items-center gap-2">
+              <Menu className="w-4 h-4 text-red-600 stroke-[2.5]" />
+              <span>Filtros & Categorías</span>
+            </div>
+            {(selectedMemberId !== 'all' || selectedCategory !== 'all') ? (
+              <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse" />
+            ) : (
+              <span className="text-[11px] font-bold text-slate-400">Ver panel ☰</span>
             )}
           </button>
-
-          {/* Quick Action Buttons for Mobile */}
-          <div className="flex items-center gap-1.5">
-            {isAdmin && (
-              <button
-                type="button"
-                onClick={() => onOpenAddRecord()}
-                className="px-2.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold flex items-center gap-1 shadow-2xs cursor-pointer active:scale-95 transition-all"
-                title="Agregar Documento"
-              >
-                <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                <span>Doc</span>
-              </button>
-            )}
-            {isAdmin && onAddPassword && (
-              <button
-                type="button"
-                onClick={() => {
-                  setIsCreatingNote(true);
-                  setNewNoteMemberId(selectedMemberId !== 'all' ? selectedMemberId : 'all');
-                  setNewNoteColor('yellow');
-                  setNewNoteTitle('');
-                  setNewNoteText('');
-                  setCollapsedCategories((prev) => ({ ...prev, notas_claves: false }));
-                }}
-                className="px-2.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black flex items-center gap-1 shadow-2xs border border-amber-600 cursor-pointer active:scale-95 transition-all"
-                title="Nueva Nota Rápida"
-              >
-                <StickyNote className="w-3.5 h-3.5 stroke-[2.5]" />
-                <span>Nota</span>
-              </button>
-            )}
-            {records.length > 0 && (
-              <button
-                type="button"
-                onClick={() => onOpenSendRecord()}
-                className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 text-xs font-bold border border-slate-200 dark:border-slate-700 cursor-pointer active:scale-95 transition-all shadow-2xs"
-                title="Enviar Datos / Adjuntos"
-              >
-                <Send className="w-3.5 h-3.5 text-red-500" />
-              </button>
-            )}
-          </div>
         </div>
 
         {/* Active Filters Row on Mobile */}
@@ -948,7 +915,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
             <div className="bg-white dark:bg-slate-900 rounded-3xl border border-amber-200 dark:border-amber-900/60 shadow-2xs overflow-hidden transition-all">
               {/* Notas Category Header */}
               <div
-                onClick={() => toggleCategoryCollapse('notas_claves')}
+                onClick={() => toggleCategoryExpand('notas_claves')}
                 className="px-4 sm:px-5 py-3.5 bg-amber-50/60 dark:bg-amber-950/40 border-b border-amber-100 dark:border-amber-900/60 flex items-center justify-between gap-3 cursor-pointer select-none hover:bg-amber-100/50 dark:hover:bg-amber-950/60 transition-colors"
               >
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -979,7 +946,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
                         setNewNoteColor('yellow');
                         setNewNoteTitle('');
                         setNewNoteText('');
-                        setCollapsedCategories((prev) => ({ ...prev, notas_claves: false }));
+                        setExpandedCategories((prev) => ({ ...prev, notas_claves: true }));
                       }}
                       className="px-2.5 py-1 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black flex items-center gap-1 shadow-2xs transition-all cursor-pointer border border-amber-600"
                       title="Agregar nueva clave"
@@ -994,17 +961,17 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
                     type="button"
                     className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
                   >
-                    {collapsedCategories['notas_claves'] ? (
-                      <ChevronDown className="w-4 h-4" />
-                    ) : (
+                    {expandedCategories['notas_claves'] ? (
                       <ChevronUp className="w-4 h-4" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4" />
                     )}
                   </button>
                 </div>
               </div>
 
               {/* Notas Body: Grid of Post-it Cards */}
-              {!collapsedCategories['notas_claves'] && (
+              {!!expandedCategories['notas_claves'] && (
                 <div className="p-3 sm:p-4 bg-amber-50/20 dark:bg-amber-950/10">
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {/* In-line creation inside Datos */}
@@ -1198,20 +1165,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
                             className={`w-20 h-3.5 mx-auto -mt-6 mb-2 rounded-xs backdrop-blur-md opacity-85 rotate-[-0.5deg] shadow-2xs ${theme.tape}`}
                           />
 
-                          <div className="flex items-center justify-between gap-1 mb-2">
-                            <div
-                              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[10px] font-black border ${theme.badge}`}
-                            >
-                              {ownerBadge.isAll ? (
-                                <Users className="w-3 h-3" />
-                              ) : (
-                                <span className={`w-2 h-2 rounded-full ${ownerBadge.avatarColor}`} />
-                              )}
-                              <span>{ownerBadge.label}</span>
-                            </div>
-                          </div>
-
-                          <div className="space-y-1.5 flex-1">
+                          <div className="space-y-1.5 flex-1 pt-1">
                             <div className="flex items-start justify-between gap-1">
                               <h4 className="text-xs sm:text-sm font-black tracking-tight leading-snug break-words">
                                 {note.website}
@@ -1331,7 +1285,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
 
           {/* ================= REGULAR PERSONAL RECORDS CATEGORY GROUPS ================= */}
           {groupedCategories.map((group) => {
-            const isCollapsed = !!collapsedCategories[group.categoryName];
+            const isExpanded = !!expandedCategories[group.categoryName];
             const catColor = group.categoryObj?.color || '#dc2626';
 
             return (
@@ -1341,7 +1295,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
               >
                 {/* Category Header Banner */}
                 <div
-                  onClick={() => toggleCategoryCollapse(group.categoryName)}
+                  onClick={() => toggleCategoryExpand(group.categoryName)}
                   className="px-4 sm:px-5 py-3.5 bg-slate-50/70 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3 cursor-pointer select-none hover:bg-slate-100/70 dark:hover:bg-slate-800/80 transition-colors"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
@@ -1349,10 +1303,10 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
                       className="w-8 h-8 rounded-xl flex items-center justify-center text-white shrink-0 shadow-xs"
                       style={{ backgroundColor: catColor }}
                     >
-                      {isCollapsed ? (
-                        <Folder className="w-4 h-4" />
-                      ) : (
+                      {isExpanded ? (
                         <FolderOpen className="w-4 h-4" />
+                      ) : (
+                        <Folder className="w-4 h-4" />
                       )}
                     </div>
                     <div className="min-w-0">
@@ -1389,17 +1343,17 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
                       type="button"
                       className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
                     >
-                      {isCollapsed ? (
-                        <ChevronDown className="w-4 h-4" />
-                      ) : (
+                      {isExpanded ? (
                         <ChevronUp className="w-4 h-4" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4" />
                       )}
                     </button>
                   </div>
                 </div>
 
                 {/* Group Body: Grid of Records in this Category */}
-                {!isCollapsed && (
+                {isExpanded && (
                   <div className="p-3 sm:p-4 bg-slate-50/30 dark:bg-slate-950/20">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                       {group.records.map((record) => {

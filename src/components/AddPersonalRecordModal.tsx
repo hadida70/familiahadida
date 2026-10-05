@@ -196,7 +196,11 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
       const isKnownSub = catObj?.subcategories?.some((s) => s.toLowerCase() === (editingRecord.subcategory || '').toLowerCase());
       setIsCustomSubcategory(!isKnownSub && !!editingRecord.subcategory);
 
-      const hasExistingCard = !!(editingRecord.cardNumber && editingRecord.cardNumber.trim().length > 0) || !!editingRecord.cardCvc || !!editingRecord.cardAtmPin;
+      const hasExistingCard = Boolean(
+        editingRecord.cardNumber?.trim() ||
+        editingRecord.cardCvc?.trim() ||
+        editingRecord.cardAtmPin?.trim()
+      );
       setIsCardMode(hasExistingCard);
     } else {
       const activeId = activeMember?.id || members[0]?.id || 'member_jaime';
@@ -813,9 +817,17 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
           {/* ================= CREDIT CARD OPTIONAL FORMAT (ACTIVATE ONLY WITH TOGGLE BUTTON) ================= */}
           {isBank && (
             <div className="space-y-3">
-              <div className="flex items-center justify-between p-3.5 rounded-2xl bg-red-50/60 dark:bg-red-950/30 border border-red-200/80 dark:border-red-900/60 transition-all">
+              <div className={`flex items-center justify-between p-3.5 rounded-2xl transition-all ${
+                isCardMode
+                  ? 'bg-red-50/70 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60'
+                  : 'bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/60'
+              }`}>
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-red-100 dark:bg-red-900/50 text-red-600 flex items-center justify-center shrink-0">
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                    isCardMode
+                      ? 'bg-red-100 dark:bg-red-900/50 text-red-600'
+                      : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+                  }`}>
                     <CreditCardIcon className="w-4 h-4" />
                   </div>
                   <div>
@@ -834,7 +846,7 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
                       {isCardMode
                         ? 'Formato de tarjeta habilitado (visualizador, CVC, vencimiento y PIN ATM).'
-                        : 'Mueve el botón rojo para introducir datos de tarjeta de crédito.'}
+                        : 'Desactivado por defecto. Toca el interruptor sólo si deseas registrar una tarjeta.'}
                     </p>
                   </div>
                 </div>
