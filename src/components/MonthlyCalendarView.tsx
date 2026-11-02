@@ -21,6 +21,9 @@ interface MonthlyCalendarViewProps {
   members: Member[];
   activeMember: Member | null;
   isAdmin?: boolean;
+  selectedMemberFilter?: string;
+  onSelectMemberFilter?: (memberId: string) => void;
+  hideMemberFilterBar?: boolean;
   onAddTask?: (task: Partial<CalendarTask>) => void;
   onUpdateTask?: (id: string, task: Partial<CalendarTask>) => void;
   onToggleComplete: (task: CalendarTask) => void;
@@ -51,6 +54,9 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
   members,
   activeMember,
   isAdmin = false,
+  selectedMemberFilter: externalMemberFilter,
+  onSelectMemberFilter,
+  hideMemberFilterBar = false,
   onAddTask,
   onUpdateTask,
   onToggleComplete,
@@ -66,8 +72,19 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
   ).padStart(2, '0')}`;
 
   const [selectedDate, setSelectedDate] = useState<string>(todayString);
-  const [selectedMemberFilter, setSelectedMemberFilter] = useState<string>('all');
+  const [internalMemberFilter, setInternalMemberFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+
+  const selectedMemberFilter =
+    externalMemberFilter !== undefined ? externalMemberFilter : internalMemberFilter;
+
+  const handleSetMemberFilter = (memberId: string) => {
+    if (onSelectMemberFilter) {
+      onSelectMemberFilter(memberId);
+    } else {
+      setInternalMemberFilter(memberId);
+    }
+  };
 
   // Fast inline task creation state
   const [quickTitle, setQuickTitle] = useState<string>('');
@@ -113,7 +130,7 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
     return `${day} de ${MONTH_NAMES[monthIdx] || ''} (${year})`;
   };
 
-  // Compute days in current month
+  // Compute days in current month (filtered by selectedMemberFilter)
   const calendarGrid = useMemo(() => {
     const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
     const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0);
@@ -121,6 +138,13 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
 
     let startingDayOfWeek = firstDayOfMonth.getDay() - 1;
     if (startingDayOfWeek === -1) startingDayOfWeek = 6;
+
+    const getTasksForDate = (dateStr: string) =>
+      tasks.filter(
+        (t) =>
+          t.date === dateStr &&
+          (selectedMemberFilter === 'all' || t.assignedToId === selectedMemberFilter)
+      );
 
     const days: Array<{
       dateStr: string;
@@ -146,7 +170,7 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
         isCurrentMonth: false,
         isToday: dateStr === todayString,
         isSelected: dateStr === selectedDate,
-        tasks: tasks.filter((t) => t.date === dateStr),
+        tasks: getTasksForDate(dateStr),
       });
     }
 
@@ -161,7 +185,7 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
         isCurrentMonth: true,
         isToday: dateStr === todayString,
         isSelected: dateStr === selectedDate,
-        tasks: tasks.filter((t) => t.date === dateStr),
+        tasks: getTasksForDate(dateStr),
       });
     }
 
@@ -180,12 +204,12 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
         isCurrentMonth: false,
         isToday: dateStr === todayString,
         isSelected: dateStr === selectedDate,
-        tasks: tasks.filter((t) => t.date === dateStr),
+        tasks: getTasksForDate(dateStr),
       });
     }
 
     return days;
-  }, [currentYear, currentMonth, tasks, selectedDate, todayString]);
+  }, [currentYear, currentMonth, tasks, selectedDate, todayString, selectedMemberFilter]);
 
   // Tasks for the selected date or all tasks matching search
   const displayedTasks = useMemo(() => {
@@ -245,20 +269,25 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
   React.useEffect(() => {
     if (!isAdmin && activeMember) {
       setQuickAssigneeId(activeMember.id);
+    } else if (selectedMemberFilter && selectedMemberFilter !== 'all') {
+      setQuickAssigneeId(selectedMemberFilter);
     }
-  }, [activeMember, isAdmin]);
+  }, [activeMember, isAdmin, selectedMemberFilter]);
 
   return (
-    <div id="monthly-calendar-view" className="space-y-4 max-w-4xl mx-auto mb-12">
-      {/* Member Filter Bar (Admin Only) */}
-      {isAdmin && (
+    <div
+      id="monthly-calendar-view"
+      className={`space-y-4 ${hideMemberFilterBar ? 'w-full' : 'max-w-4xl mx-auto mb-12'}`}
+    >
+      {/* Member Filter Bar (Admin Only, hidden when unified with left sidebar) */}
+      {isAdmin && !hideMemberFilterBar && (
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-3 shadow-2xs">
           <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
             <span className="text-[11px] font-extrabold text-slate-400 uppercase shrink-0">
               Integrantes:
             </span>
             <button
-              onClick={() => setSelectedMemberFilter('all')}
+              onClick={() => handleSetMemberFilter('all')}
               className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all shrink-0 cursor-pointer border ${
                 selectedMemberFilter === 'all'
                   ? 'bg-white dark:bg-slate-900 text-red-600 border-red-600 shadow-2xs ring-1 ring-red-500/20'
@@ -273,7 +302,7 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
               return (
                 <button
                   key={m.id}
-                  onClick={() => setSelectedMemberFilter(isSelected ? 'all' : m.id)}
+                  onClick={() => handleSetMemberFilter(isSelected ? 'all' : m.id)}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 border cursor-pointer ${
                     isSelected
                       ? `${mTheme.badge} shadow-2xs ring-2 ring-offset-1 font-black`
@@ -290,7 +319,7 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
       )}
 
       {/* Calendar Grid Card */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden">
         {/* Month Navigation Toolbar */}
         <div className="p-3.5 sm:p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -387,7 +416,13 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
                         <span className="font-black shrink-0">
                           {assignee ? assignee.name : 'Familia'}:
                         </span>
-                        <span className={`truncate ${t.completed ? 'line-through opacity-60 text-slate-500' : 'text-slate-800 dark:text-slate-200'}`}>
+                        <span
+                          className={`truncate ${
+                            t.completed
+                              ? 'line-through opacity-60 text-slate-500'
+                              : 'text-slate-800 dark:text-slate-200'
+                          }`}
+                        >
                           {t.title}
                         </span>
                       </div>
@@ -421,7 +456,7 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
       </div>
 
       {/* Task List Section: Día · Nombre Integrante (con Color) · Tarea */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-5 shadow-2xs space-y-4">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-4 sm:p-5 shadow-2xs space-y-4">
         {/* Selected Date Header */}
         <div className="flex items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
           <div className="flex items-center gap-2">
@@ -468,7 +503,11 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
                     className="px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-red-300 dark:border-red-900 text-xs font-bold text-red-600 dark:text-red-400 outline-none hover:border-red-500 shadow-2xs"
                   >
                     {members.map((m) => (
-                      <option key={m.id} value={m.id} className="text-slate-900 dark:text-white font-medium">
+                      <option
+                        key={m.id}
+                        value={m.id}
+                        className="text-slate-900 dark:text-white font-medium"
+                      >
                         {m.name}
                       </option>
                     ))}
@@ -504,7 +543,7 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
           />
         </div>
 
-        {/* Tasks List: Formato: [Día] · [Nombre Integrante con borde rojo] · [Tarea] */}
+        {/* Tasks List: Formato: [Día] · [Nombre Integrante con color] · [Tarea] */}
         {displayedTasks.length > 0 ? (
           <div className="space-y-2.5 pt-1">
             {displayedTasks.map((task) => {
@@ -521,7 +560,7 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
                       : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-2xs hover:border-slate-300'
                   }`}
                 >
-                  {/* Checkbox + Info: Día · Integrante (Borde Rojo) · Tarea */}
+                  {/* Checkbox + Info: Día · Integrante · Tarea */}
                   <div className="flex items-start gap-3 min-w-0 flex-1">
                     <button
                       onClick={() => onToggleComplete(task)}
@@ -536,7 +575,7 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
                     </button>
 
                     <div className="min-w-0 flex-1">
-                      {/* Día + Nombre Integrante: Fondo blanco borde rojo */}
+                      {/* Día + Nombre Integrante */}
                       <div className="flex items-center gap-1.5 flex-wrap mb-1">
                         {/* Día */}
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[11px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
@@ -546,9 +585,15 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
 
                         {/* Nombre Integrante con su color distintivo */}
                         <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-[11px] font-black border shadow-2xs ${getMemberColorTheme(assignee, task.assignedToId).badge}`}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-[11px] font-black border shadow-2xs ${
+                            getMemberColorTheme(assignee, task.assignedToId).badge
+                          }`}
                         >
-                          <span className={`w-2 h-2 rounded-full ${getMemberColorTheme(assignee, task.assignedToId).dot}`} />
+                          <span
+                            className={`w-2 h-2 rounded-full ${
+                              getMemberColorTheme(assignee, task.assignedToId).dot
+                            }`}
+                          />
                           <span>{assignee ? assignee.name : 'Toda la Familia'}</span>
                         </span>
                       </div>
@@ -599,7 +644,7 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Actions (Admin only for edit/delete/alert; members can add and toggle completion) */}
+                  {/* Actions */}
                   {isAdmin && (
                     <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
                       {onSendTaskAlert && (

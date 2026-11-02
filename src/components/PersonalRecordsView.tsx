@@ -13,19 +13,17 @@ import {
   Trash2,
   ExternalLink,
   Share2,
-  User,
   Users,
   X,
   Menu,
-  Save,
-  Palette,
-  FileSpreadsheet,
+  Calendar as CalendarIcon,
 } from 'lucide-react';
-import { Member, PersonalRecord, DataCategory, PasswordItem } from '../types';
+import { Member, PersonalRecord, DataCategory, PasswordItem, CalendarTask } from '../types';
 import { PersonalRecordCard } from './PersonalRecordCard';
 import { ExcelTableViewer } from './ExcelTableViewer';
+import { MonthlyCalendarView } from './MonthlyCalendarView';
 import { sounds } from '../lib/sound';
-import { getMemberPostitColor } from '../lib/memberColors';
+import { getMemberPostitColor, getMemberColorTheme } from '../lib/memberColors';
 import {
   isTableContent,
   parseTableContent,
@@ -36,6 +34,7 @@ import {
 interface PersonalRecordsViewProps {
   records: PersonalRecord[];
   passwords?: PasswordItem[];
+  tasks?: CalendarTask[];
   members: Member[];
   categories?: DataCategory[];
   activeMember: Member | null;
@@ -53,6 +52,12 @@ interface PersonalRecordsViewProps {
   onAddPassword?: (password: Partial<PasswordItem>) => void;
   onUpdatePassword?: (id: string, updates: Partial<PasswordItem>) => void;
   onDeletePassword?: (id: string) => void;
+  onAddTask?: (task: Partial<CalendarTask>) => void;
+  onUpdateTask?: (id: string, task: Partial<CalendarTask>) => void;
+  onToggleTaskComplete?: (task: CalendarTask) => void;
+  onDeleteTask?: (id: string) => void;
+  onSendTaskAlert?: (task: CalendarTask) => void;
+  fontSize?: 'normal' | 'large' | 'xlarge';
 }
 
 const POSTIT_COLORS = [
@@ -138,6 +143,7 @@ const THEMES_MAP = POSTIT_COLORS.reduce((acc, c) => {
 export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
   records,
   passwords = [],
+  tasks = [],
   members,
   categories = [],
   activeMember,
@@ -153,6 +159,12 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
   onAddPassword,
   onUpdatePassword,
   onDeletePassword,
+  onAddTask,
+  onUpdateTask,
+  onToggleTaskComplete,
+  onDeleteTask,
+  onSendTaskAlert,
+  fontSize = 'normal',
 }) => {
   const [selectedMemberId, setSelectedMemberId] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -233,18 +245,29 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
       if (selectedMemberId !== 'all' && r.memberId !== selectedMemberId) {
         return false;
       }
-      if (selectedCategory !== 'all' && selectedCategory !== 'notas_claves' && r.category?.toLowerCase() !== selectedCategory.toLowerCase()) {
+      if (
+        selectedCategory !== 'all' &&
+        selectedCategory !== 'notas_claves' &&
+        r.category?.toLowerCase() !== selectedCategory.toLowerCase()
+      ) {
         return false;
       }
       return true;
     });
   }, [records, selectedMemberId, selectedCategory]);
 
-  // Counts per member (includes records and notes)
+  // Counts per member (includes calendar tasks, records, and notes)
   const memberCounts = useMemo(() => {
-    const counts: Record<string, { records: number; notes: number; total: number }> = {};
+    const counts: Record<string, { tasks: number; records: number; notes: number; total: number }> = {};
     members.forEach((m) => {
-      counts[m.id] = { records: 0, notes: 0, total: 0 };
+      counts[m.id] = { tasks: 0, records: 0, notes: 0, total: 0 };
+    });
+
+    tasks.forEach((t) => {
+      if (t.assignedToId && counts[t.assignedToId]) {
+        counts[t.assignedToId].tasks += 1;
+        counts[t.assignedToId].total += 1;
+      }
     });
 
     records.forEach((r) => {
@@ -262,7 +285,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
     });
 
     return counts;
-  }, [records, passwords, members]);
+  }, [tasks, records, passwords, members]);
 
   // Group filtered records by Category
   const groupedCategories = useMemo(() => {
@@ -400,29 +423,6 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
     setEditingNoteId(null);
   };
 
-  const getOwnerBadge = (memberId?: string) => {
-    if (!memberId || memberId === 'all') {
-      return {
-        label: 'Toda la Familia',
-        isAll: true,
-        avatarColor: 'bg-amber-600',
-      };
-    }
-    const member = members.find((m) => m.id === memberId);
-    if (!member) {
-      return {
-        label: 'Compartido',
-        isAll: true,
-        avatarColor: 'bg-slate-500',
-      };
-    }
-    return {
-      label: member.name,
-      isAll: false,
-      avatarColor: member.avatarColor || 'bg-blue-600',
-    };
-  };
-
   const formatWebsiteUrl = (web: string) => {
     let clean = (web || '').trim();
     if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
@@ -436,7 +436,9 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
   };
 
   const isNotesCategoryActive = selectedCategory === 'all' || selectedCategory === 'notas_claves';
-  const showNotesGroup = isNotesCategoryActive && (filteredNotes.length > 0 || selectedCategory === 'notas_claves' || isCreatingNote);
+  const showNotesGroup =
+    isNotesCategoryActive &&
+    (filteredNotes.length > 0 || selectedCategory === 'notas_claves' || isCreatingNote);
 
   const renderSidebarContent = (isMobileDrawer: boolean = false) => {
     const onSelect = () => {
@@ -484,7 +486,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
             </div>
           ) : (
             <div className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-center">
-              <span className="text-[11px] font-bold text-slate-500">🔒 Modo Solo Lectura</span>
+              <span className="text-[11px] font-bold text-slate-500">🔒 Modo Familiar</span>
             </div>
           )}
 
@@ -503,7 +505,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
           )}
         </div>
 
-        {/* Section: Integrantes de la Familia */}
+        {/* Section: Integrantes de la Familia (Filtra tanto Calendario como Datos) */}
         <div className="space-y-2">
           <div className="flex items-center justify-between px-1">
             <span className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
@@ -539,19 +541,25 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
               }`}
             >
               <div className="flex items-center gap-2.5">
-                <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-black ${
-                  selectedMemberId === 'all' ? 'bg-red-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
-                }`}>
+                <div
+                  className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-black ${
+                    selectedMemberId === 'all'
+                      ? 'bg-red-500 text-white'
+                      : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                  }`}
+                >
                   👥
                 </div>
                 <span>Toda la Familia</span>
               </div>
-              <span className={`text-[11px] px-2 py-0.5 rounded-full font-extrabold ${
-                selectedMemberId === 'all'
-                  ? 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
-              }`}>
-                {records.length + passwords.length}
+              <span
+                className={`text-[11px] px-2 py-0.5 rounded-full font-extrabold ${
+                  selectedMemberId === 'all'
+                    ? 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                }`}
+              >
+                {tasks.length + records.length + passwords.length}
               </span>
             </button>
 
@@ -560,31 +568,36 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
               const isSelected = selectedMemberId === m.id;
               const countObj = memberCounts[m.id];
               const totalCount = countObj ? countObj.total : 0;
+              const mTheme = getMemberColorTheme(m, m.id);
               return (
                 <button
                   key={m.id}
                   type="button"
                   onClick={() => {
-                    handleMemberChange(m.id);
+                    handleMemberChange(isSelected ? 'all' : m.id);
                     onSelect();
                   }}
                   className={`w-full px-3 py-2 rounded-2xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer ${
                     isSelected
-                      ? 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/60 font-black shadow-2xs'
+                      ? `${mTheme.badge} font-black shadow-2xs ring-1 ring-current/20`
                       : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60 border border-transparent'
                   }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black text-white shrink-0 ${m.avatarColor || 'bg-blue-600'}`}>
+                    <div
+                      className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black text-white shrink-0 ${mTheme.pillBg}`}
+                    >
                       {m.name.charAt(0).toUpperCase()}
                     </div>
                     <span className="truncate">{m.name}</span>
                   </div>
-                  <span className={`text-[11px] px-2 py-0.5 rounded-full font-extrabold shrink-0 ${
-                    isSelected
-                      ? 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
-                  }`}>
+                  <span
+                    className={`text-[11px] px-2 py-0.5 rounded-full font-extrabold shrink-0 ${
+                      isSelected
+                        ? 'bg-white/80 dark:bg-slate-900/80 text-slate-900 dark:text-white'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                    }`}
+                  >
                     {totalCount}
                   </span>
                 </button>
@@ -598,7 +611,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
           <div className="flex items-center justify-between px-1">
             <span className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
               <Folder className="w-3.5 h-3.5 text-slate-400" />
-              <span>CATEGORÍAS</span>
+              <span>CATEGORÍAS DE DATOS</span>
             </span>
             {selectedCategory !== 'all' && (
               <button
@@ -632,11 +645,13 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
                 <span>📁</span>
                 <span>Todas las categorías</span>
               </div>
-              <span className={`text-[11px] px-2 py-0.5 rounded-full font-extrabold ${
-                selectedCategory === 'all'
-                  ? 'bg-white/20 dark:bg-slate-900/20 text-white dark:text-slate-900'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
-              }`}>
+              <span
+                className={`text-[11px] px-2 py-0.5 rounded-full font-extrabold ${
+                  selectedCategory === 'all'
+                    ? 'bg-white/20 dark:bg-slate-900/20 text-white dark:text-slate-900'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                }`}
+              >
                 {records.length + filteredNotes.length}
               </span>
             </button>
@@ -658,11 +673,13 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
                 <StickyNote className="w-3.5 h-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
                 <span>Claves</span>
               </div>
-              <span className={`text-[11px] px-2 py-0.5 rounded-full font-black ${
-                selectedCategory === 'notas_claves'
-                  ? 'bg-amber-700 text-white'
-                  : 'bg-amber-200/90 text-amber-950 dark:bg-amber-900 dark:text-amber-200'
-              }`}>
+              <span
+                className={`text-[11px] px-2 py-0.5 rounded-full font-black ${
+                  selectedCategory === 'notas_claves'
+                    ? 'bg-amber-700 text-white'
+                    : 'bg-amber-200/90 text-amber-950 dark:bg-amber-900 dark:text-amber-200'
+                }`}
+              >
                 {filteredNotes.length}
               </span>
             </button>
@@ -698,11 +715,13 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
                     <span className="truncate">{catName}</span>
                   </div>
                   {countInCat > 0 && (
-                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-extrabold shrink-0 ${
-                      isSelected
-                        ? 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
-                    }`}>
+                    <span
+                      className={`text-[11px] px-2 py-0.5 rounded-full font-extrabold shrink-0 ${
+                        isSelected
+                          ? 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                      }`}
+                    >
                       {countInCat}
                     </span>
                   )}
@@ -729,11 +748,15 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
         {/* Quick Summary Footnote */}
         <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 space-y-1">
           <div className="flex justify-between">
+            <span>📅 Tareas Calendario:</span>
+            <span className="font-bold text-slate-700 dark:text-slate-300">{tasks.length}</span>
+          </div>
+          <div className="flex justify-between">
             <span>📄 Documentos:</span>
             <span className="font-bold text-slate-700 dark:text-slate-300">{records.length}</span>
           </div>
           <div className="flex justify-between">
-            <span>📌 Notas & Claves:</span>
+            <span>📌 Claves:</span>
             <span className="font-bold text-slate-700 dark:text-slate-300">{passwords.length}</span>
           </div>
         </div>
@@ -743,10 +766,9 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
 
   return (
     <div id="personal-records-section" className="w-full mb-10">
-      {/* ================= MOBILE TOP BAR WITH HAMBURGER BUTTON (TIPO GMAIL) ================= */}
-      <div className="block lg:hidden mb-4 bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+      {/* ================= MOBILE TOP BAR WITH HAMBURGER BUTTON & INTEGRANTES QUICK BAR ================= */}
+      <div className="block lg:hidden mb-4 bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2.5">
         <div className="flex items-center justify-between gap-2">
-          {/* Hamburger 3-Stripes Button (tipo Gmail) */}
           <button
             type="button"
             onClick={() => setIsMobileDrawerOpen(true)}
@@ -754,9 +776,9 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
           >
             <div className="flex items-center gap-2">
               <Menu className="w-4 h-4 text-red-600 stroke-[2.5]" />
-              <span>Filtros & Categorías</span>
+              <span>Integrantes & Categorías</span>
             </div>
-            {(selectedMemberId !== 'all' || selectedCategory !== 'all') ? (
+            {selectedMemberId !== 'all' || selectedCategory !== 'all' ? (
               <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse" />
             ) : (
               <span className="text-[11px] font-bold text-slate-400">Ver panel ☰</span>
@@ -764,9 +786,43 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
           </button>
         </div>
 
+        {/* Mobile Quick Integrantes Filter Strip */}
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
+          <button
+            type="button"
+            onClick={() => handleMemberChange('all')}
+            className={`px-2.5 py-1 rounded-xl text-[11px] font-extrabold shrink-0 border transition-all cursor-pointer ${
+              selectedMemberId === 'all'
+                ? 'bg-red-600 text-white border-red-600 shadow-2xs'
+                : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+            }`}
+          >
+            Todos
+          </button>
+          {members.map((m) => {
+            const isSelected = selectedMemberId === m.id;
+            const mTheme = getMemberColorTheme(m, m.id);
+            return (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => handleMemberChange(isSelected ? 'all' : m.id)}
+                className={`px-2.5 py-1 rounded-xl text-[11px] font-bold shrink-0 flex items-center gap-1.5 border transition-all cursor-pointer ${
+                  isSelected
+                    ? `${mTheme.badge} font-black ring-1 ring-current/30 shadow-2xs`
+                    : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'
+                }`}
+              >
+                <span className={`w-2 h-2 rounded-full ${mTheme.dot}`} />
+                <span>{m.name}</span>
+              </button>
+            );
+          })}
+        </div>
+
         {/* Active Filters Row on Mobile */}
         {(selectedMemberId !== 'all' || selectedCategory !== 'all') && (
-          <div className="flex items-center gap-1.5 mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800 overflow-x-auto scrollbar-none text-[11px]">
+          <div className="flex items-center gap-1.5 pt-2 border-t border-slate-100 dark:border-slate-800 overflow-x-auto scrollbar-none text-[11px]">
             <span className="font-bold text-slate-400 shrink-0">Filtro:</span>
             {selectedMemberId !== 'all' && (
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-red-50 dark:bg-red-950/50 text-red-600 dark:text-red-400 font-bold border border-red-200 dark:border-red-900/60 shrink-0">
@@ -809,15 +865,12 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
       {/* ================= MOBILE SLIDE-OVER DRAWER (TIPO GMAIL) ================= */}
       {isMobileDrawerOpen && (
         <div className="fixed inset-0 z-50 lg:hidden flex">
-          {/* Backdrop Blur Overlay */}
           <div
             className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs transition-opacity animate-in fade-in duration-200 cursor-pointer"
             onClick={() => setIsMobileDrawerOpen(false)}
           />
 
-          {/* Drawer Slide-Out Panel */}
           <div className="relative flex flex-col w-[85%] max-w-xs h-full bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 shadow-2xl z-10 overflow-hidden animate-in slide-in-from-left duration-250">
-            {/* Drawer Header */}
             <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/70">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-xl bg-red-600 flex items-center justify-center text-white shadow-sm font-bold">
@@ -825,7 +878,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
                 </div>
                 <div>
                   <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">
-                    Filtros & Categorías
+                    Integrantes & Categorías
                   </h3>
                   <p className="text-[10px] text-slate-500 font-medium">Familia Hadida</p>
                 </div>
@@ -839,7 +892,6 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
               </button>
             </div>
 
-            {/* Drawer Scrollable Body */}
             <div className="flex-1 overflow-y-auto p-4 scrollbar-none">
               {renderSidebarContent(true)}
             </div>
@@ -847,21 +899,22 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
         </div>
       )}
 
-      {/* ================= MAIN RESPONSIVE CONTAINER (SIDEBAR ON DESKTOP + MAIN CONTENT) ================= */}
+      {/* ================= MAIN RESPONSIVE CONTAINER (LEFT SIDEBAR + UNIFIED CALENDAR & DATOS) ================= */}
       <div className="flex flex-col lg:flex-row items-start gap-6">
-        
         {/* ================= DESKTOP LEFT SIDEBAR (lg:flex) ================= */}
         <aside className="hidden lg:flex flex-col w-72 shrink-0 sticky top-20 bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-5 max-h-[calc(100vh-6rem)] overflow-y-auto custom-scrollbar overscroll-contain">
           {renderSidebarContent(false)}
         </aside>
 
-        {/* ================= RIGHT MAIN CONTENT AREA ================= */}
-        <div className="flex-1 min-w-0 space-y-4 w-full">
+        {/* ================= RIGHT MAIN CONTENT AREA (CALENDARIO + DATOS UNIFICADOS) ================= */}
+        <div className="flex-1 min-w-0 space-y-6 w-full">
           {/* Active Filter Indicator / Breadcrumb */}
           {(selectedMemberId !== 'all' || selectedCategory !== 'all') && (
             <div className="flex items-center justify-between p-3 rounded-2xl bg-red-50/60 dark:bg-red-950/30 border border-red-200/70 dark:border-red-900/40 text-xs">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-bold text-slate-500 dark:text-slate-400">Filtrando por:</span>
+                <span className="font-bold text-slate-500 dark:text-slate-400">
+                  Filtrando calendario y datos por:
+                </span>
                 {selectedMemberId !== 'all' && (
                   <span className="px-2.5 py-0.5 rounded-full bg-white dark:bg-slate-900 text-red-600 font-black border border-red-200 shadow-2xs flex items-center gap-1">
                     👤 {members.find((m) => m.id === selectedMemberId)?.name || 'Integrante'}
@@ -900,546 +953,595 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
             </div>
           )}
 
-          {/* ================= CATEGORY-GROUPED RECORDS & NOTAS VIEW ================= */}
-          {(groupedCategories.length > 0 || showNotesGroup) ? (
-            <div className="space-y-4">
-          {/* Controls to Collapse / Expand All */}
-          {(groupedCategories.length + (showNotesGroup ? 1 : 0)) > 1 && (
-            <div className="flex items-center justify-between px-2 text-xs text-slate-500 dark:text-slate-400">
-              <span className="font-bold">
-                {groupedCategories.length + (showNotesGroup ? 1 : 0)} categorías ({filteredRecords.length + (showNotesGroup ? filteredNotes.length : 0)} registros)
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={expandAll}
-                  className="hover:text-red-600 font-bold transition-colors cursor-pointer"
-                >
-                  Expandir todas
-                </button>
-                <span>•</span>
-                <button
-                  type="button"
-                  onClick={collapseAll}
-                  className="hover:text-red-600 font-bold transition-colors cursor-pointer"
-                >
-                  Colapsar todas
-                </button>
-              </div>
-            </div>
+          {/* ================= SECCIÓN 1: CALENDARIO MENSUAL Y TAREAS ================= */}
+          {onToggleTaskComplete && onDeleteTask && (
+            <MonthlyCalendarView
+              tasks={tasks}
+              members={members}
+              activeMember={activeMember}
+              isAdmin={isAdmin}
+              selectedMemberFilter={selectedMemberId}
+              onSelectMemberFilter={handleMemberChange}
+              hideMemberFilterBar={true}
+              onAddTask={onAddTask}
+              onUpdateTask={onUpdateTask}
+              onToggleComplete={onToggleTaskComplete}
+              onDeleteTask={onDeleteTask}
+              onSendTaskAlert={onSendTaskAlert}
+              fontSize={fontSize}
+            />
           )}
 
-          {/* ================= 🔑 CLAVES POST-IT GROUP ================= */}
-          {showNotesGroup && (
-            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-amber-200 dark:border-amber-900/60 shadow-2xs overflow-hidden transition-all">
-              {/* Notas Category Header */}
-              <div
-                onClick={() => toggleCategoryExpand('notas_claves')}
-                className="px-4 sm:px-5 py-3.5 bg-amber-50/60 dark:bg-amber-950/40 border-b border-amber-100 dark:border-amber-900/60 flex items-center justify-between gap-3 cursor-pointer select-none hover:bg-amber-100/50 dark:hover:bg-amber-950/60 transition-colors"
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center shrink-0 shadow-xs font-black">
-                    <StickyNote className="w-4 h-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white truncate">
-                        Claves
-                      </h3>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-black bg-amber-200/90 dark:bg-amber-900 text-amber-950 dark:text-amber-200 border border-amber-300 dark:border-amber-800">
-                        {filteredNotes.length} {filteredNotes.length === 1 ? 'clave' : 'claves'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 shrink-0">
-                  {/* Admin quick add note */}
-                  {isAdmin && onAddPassword && !isCreatingNote && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setIsCreatingNote(true);
-                        setNewNoteMemberId(selectedMemberId !== 'all' ? selectedMemberId : 'all');
-                        setNewNoteColor('yellow');
-                        setNewNoteTitle('');
-                        setNewNoteText('');
-                        setExpandedCategories((prev) => ({ ...prev, notas_claves: true }));
-                      }}
-                      className="px-2.5 py-1 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black flex items-center gap-1 shadow-2xs transition-all cursor-pointer border border-amber-600"
-                      title="Agregar nueva clave"
-                    >
-                      <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                      <span className="hidden sm:inline">Nueva Clave</span>
-                    </button>
-                  )}
-
-                  {/* Chevron expand/collapse */}
-                  <button
-                    type="button"
-                    className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
-                  >
-                    {expandedCategories['notas_claves'] ? (
-                      <ChevronUp className="w-4 h-4" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4" />
-                    )}
-                  </button>
-                </div>
+          {/* ================= SECCIÓN 2: DATOS PERSONALES, CATEGORÍAS Y CLAVES ================= */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between px-2">
+              <div className="flex items-center gap-2">
+                <Folder className="w-4 h-4 text-red-600" />
+                <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white uppercase tracking-wide">
+                  Datos y Claves
+                </h3>
+                <span className="text-xs text-slate-500 dark:text-slate-400 font-bold">
+                  ({filteredRecords.length + (showNotesGroup ? filteredNotes.length : 0)})
+                </span>
               </div>
 
-              {/* Notas Body: Grid of Post-it Cards */}
-              {!!expandedCategories['notas_claves'] && (
-                <div className="p-3 sm:p-4 bg-amber-50/20 dark:bg-amber-950/10">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {/* In-line creation inside Datos */}
-                    {isCreatingNote && (
-                      <div
-                        className={`relative rounded-3xl p-4 border-2 border-dashed flex flex-col justify-between transition-all duration-200 shadow-xl ${
-                          THEMES_MAP[newNoteColor]?.card || THEMES_MAP.yellow.card
-                        }`}
-                      >
-                        {/* Scotch Tape */}
-                        <div
-                          className={`w-20 h-3.5 mx-auto -mt-6 mb-2 rounded-xs backdrop-blur-md opacity-85 rotate-[-0.5deg] shadow-2xs ${
-                            THEMES_MAP[newNoteColor]?.tape || THEMES_MAP.yellow.tape
-                          }`}
-                        />
-
-                        {/* Controls: Color Dots & Owner */}
-                        <div className="space-y-2.5 flex-1">
-                          <div className="flex items-center justify-between gap-1.5 flex-wrap pb-1.5 border-b border-black/10 dark:border-white/10">
-                            <div className="flex items-center gap-1">
-                              {POSTIT_COLORS.map((c) => (
-                                <button
-                                  key={c.id}
-                                  type="button"
-                                  onClick={() => setNewNoteColor(c.id)}
-                                  className={`w-4 h-4 rounded-full border border-black/20 cursor-pointer ${c.dotClass} ${
-                                    newNoteColor === c.id ? 'scale-125 ring-2 ring-slate-950 dark:ring-white' : 'opacity-70'
-                                  }`}
-                                  title={c.name}
-                                />
-                              ))}
-                            </div>
-
-                            <select
-                              value={newNoteMemberId}
-                              onChange={(e) => {
-                                const mid = e.target.value;
-                                setNewNoteMemberId(mid);
-                                if (mid !== 'all') {
-                                  const mObj = members.find((m) => m.id === mid);
-                                  setNewNoteColor(getMemberPostitColor(mObj, mid));
-                                }
-                              }}
-                              className="text-[11px] font-bold bg-white/70 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-lg px-1.5 py-0.5 outline-none cursor-pointer"
-                            >
-                              <option value="all">👥 Familia</option>
-                              {members.map((m) => (
-                                <option key={m.id} value={m.id}>
-                                  👤 {m.name}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <input
-                            ref={noteTitleInputRef}
-                            type="text"
-                            value={newNoteTitle}
-                            onChange={(e) => setNewNoteTitle(e.target.value)}
-                            placeholder="Título de la clave..."
-                            className="w-full px-2.5 py-1.5 text-xs sm:text-sm font-black bg-white/60 dark:bg-black/30 border border-black/10 dark:border-white/10 rounded-xl placeholder-slate-500/70 outline-none"
-                            onKeyDown={(e) => {
-                              if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-                                handleSaveNewNote();
-                              }
-                            }}
-                          />
-
-                          <textarea
-                            rows={3}
-                            value={newNoteText}
-                            onChange={(e) => setNewNoteText(e.target.value)}
-                            placeholder="Escribe aquí tu clave..."
-                            className="w-full px-2.5 py-1.5 text-xs bg-white/60 dark:bg-black/30 border border-black/10 dark:border-white/10 rounded-xl placeholder-slate-500/70 outline-none resize-none"
-                            onKeyDown={(e) => {
-                              if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-                                handleSaveNewNote();
-                              }
-                            }}
-                          />
-                        </div>
-
-                        {/* Actions */}
-                        <div className="pt-2 mt-2 border-t border-black/10 dark:border-white/10 flex items-center justify-end gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => setIsCreatingNote(false)}
-                            className="px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-black/10 cursor-pointer"
-                          >
-                            Cancelar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleSaveNewNote}
-                            disabled={!newNoteTitle.trim() && !newNoteText.trim()}
-                            className="px-3 py-1 rounded-lg text-xs font-black bg-slate-950 text-white dark:bg-white dark:text-slate-950 cursor-pointer shadow-xs disabled:opacity-40"
-                          >
-                            Guardar
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Existing Notes */}
-                    {filteredNotes.map((note) => {
-                      const isEditing = editingNoteId === note.id;
-                      const memberColor = note.memberId && note.memberId !== 'all'
-                        ? getMemberPostitColor(members.find((m) => m.id === note.memberId), note.memberId)
-                        : (note.color || 'yellow');
-                      const colorKey = THEMES_MAP[memberColor] ? memberColor : (THEMES_MAP[note.color || ''] ? note.color! : 'yellow');
-                      const theme = THEMES_MAP[colorKey] || THEMES_MAP.yellow;
-                      const ownerBadge = getOwnerBadge(note.memberId);
-                      const isCopied = copiedNoteId === `datos_note_${note.id}`;
-                      const webUrl = formatWebsiteUrl(note.website);
-
-                      if (isEditing) {
-                        const editTheme = THEMES_MAP[editNoteColor] || theme;
-                        return (
-                          <div
-                            key={note.id}
-                            className={`relative rounded-3xl p-4 border-2 border-amber-400 flex flex-col justify-between transition-all duration-200 shadow-xl ${editTheme.card}`}
-                          >
-                            <div
-                              className={`w-20 h-3.5 mx-auto -mt-6 mb-2 rounded-xs backdrop-blur-md opacity-85 rotate-[-0.5deg] shadow-2xs ${editTheme.tape}`}
-                            />
-
-                            <div className="space-y-2.5 flex-1">
-                              <div className="flex items-center justify-between gap-1.5 flex-wrap pb-1.5 border-b border-black/10 dark:border-white/10">
-                                <div className="flex items-center gap-1">
-                                  {POSTIT_COLORS.map((c) => (
-                                    <button
-                                      key={c.id}
-                                      type="button"
-                                      onClick={() => setEditNoteColor(c.id)}
-                                      className={`w-4 h-4 rounded-full border border-black/20 cursor-pointer ${c.dotClass} ${
-                                        editNoteColor === c.id ? 'scale-125 ring-2 ring-slate-950 dark:ring-white' : 'opacity-70'
-                                      }`}
-                                      title={c.name}
-                                    />
-                                  ))}
-                                </div>
-
-                                <select
-                                  value={editNoteMemberId}
-                                  onChange={(e) => {
-                                    const mid = e.target.value;
-                                    setEditNoteMemberId(mid);
-                                    if (mid !== 'all') {
-                                      const mObj = members.find((m) => m.id === mid);
-                                      setEditNoteColor(getMemberPostitColor(mObj, mid));
-                                    }
-                                  }}
-                                  className="text-[11px] font-bold bg-white/70 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-lg px-1.5 py-0.5 outline-none cursor-pointer"
-                                >
-                                  <option value="all">👥 Familia</option>
-                                  {members.map((m) => (
-                                    <option key={m.id} value={m.id}>
-                                      👤 {m.name}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-
-                              <input
-                                type="text"
-                                value={editNoteTitle}
-                                onChange={(e) => setEditNoteTitle(e.target.value)}
-                                placeholder="Título de la clave..."
-                                className="w-full px-2.5 py-1.5 text-xs sm:text-sm font-black bg-white/60 dark:bg-black/30 border border-black/10 dark:border-white/10 rounded-xl outline-none"
-                              />
-
-                              <textarea
-                                rows={3}
-                                value={editNoteText}
-                                onChange={(e) => setEditNoteText(e.target.value)}
-                                placeholder="Escribe aquí tu clave..."
-                                className="w-full px-2.5 py-1.5 text-xs bg-white/60 dark:bg-black/30 border border-black/10 dark:border-white/10 rounded-xl outline-none resize-none"
-                              />
-                            </div>
-
-                            <div className="pt-2 mt-2 border-t border-black/10 dark:border-white/10 flex items-center justify-end gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() => setEditingNoteId(null)}
-                                className="px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-black/10 cursor-pointer"
-                              >
-                                Cancelar
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleSaveEditNote(note.id)}
-                                disabled={!editNoteTitle.trim() && !editNoteText.trim()}
-                                className="px-3 py-1 rounded-lg text-xs font-black bg-slate-950 text-white dark:bg-white dark:text-slate-950 cursor-pointer shadow-xs disabled:opacity-40"
-                              >
-                                Guardar
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div
-                          key={note.id}
-                          className={`relative rounded-3xl p-4 border transition-all duration-200 hover:-translate-y-1 hover:shadow-lg flex flex-col justify-between group ${theme.card}`}
-                        >
-                          <div
-                            className={`w-20 h-3.5 mx-auto -mt-6 mb-2 rounded-xs backdrop-blur-md opacity-85 rotate-[-0.5deg] shadow-2xs ${theme.tape}`}
-                          />
-
-                          <div className="space-y-1.5 flex-1 pt-1">
-                            <div className="flex items-start justify-between gap-1">
-                              <h4 className="text-xs sm:text-sm font-black tracking-tight leading-snug break-words">
-                                {note.website}
-                              </h4>
-                              {webUrl && (
-                                <a
-                                  href={webUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="p-0.5 rounded opacity-70 hover:opacity-100 shrink-0"
-                                >
-                                  <ExternalLink className="w-3 h-3" />
-                                </a>
-                              )}
-                            </div>
-
-                            {isTableContent(note.notes) ? (
-                              <div className="pt-1">
-                                <ExcelTableViewer
-                                  table={parseTableContent(note.notes)!}
-                                  title={note.website}
-                                  themeId={note.color}
-                                  compact
-                                />
-                              </div>
-                            ) : note.notes ? (
-                              <div className="p-2.5 rounded-xl bg-white/40 dark:bg-black/20 border border-black/5 dark:border-white/5">
-                                <p className="text-[11px] sm:text-xs whitespace-pre-wrap leading-relaxed font-sans select-text">
-                                  {note.notes}
-                                </p>
-                              </div>
-                            ) : null}
-                          </div>
-
-                          <div className="pt-2 mt-2 border-t border-black/10 dark:border-white/10 flex items-center justify-between gap-1">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                let full = '';
-                                if (isTableContent(note.notes)) {
-                                  const parsed = parseTableContent(note.notes);
-                                  if (parsed) full = tableToTSV(parsed);
-                                }
-                                if (!full) {
-                                  full = `${note.website ? `🔑 ${note.website}\n\n` : ''}${note.notes || ''}`.trim();
-                                }
-                                handleCopyNote(full, `datos_note_${note.id}`);
-                              }}
-                              className={`px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer bg-white/40 dark:bg-black/20 ${theme.actionHover}`}
-                              title={isTableContent(note.notes) ? 'Copiar tabla en formato Excel' : 'Copiar clave'}
-                            >
-                              {isCopied ? (
-                                <>
-                                  <Check className="w-2.5 h-2.5 text-emerald-700 dark:text-emerald-400 stroke-[3]" />
-                                  <span>¡Copiado!</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Copy className="w-2.5 h-2.5 opacity-75" />
-                                  <span>{isTableContent(note.notes) ? 'Copiar Tabla' : 'Copiar'}</span>
-                                </>
-                              )}
-                            </button>
-
-                            <div className="flex items-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => handleShareNoteWhatsApp(note)}
-                                className="p-1 rounded-lg hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 transition-colors cursor-pointer"
-                                title="Compartir por WhatsApp"
-                              >
-                                <Share2 className="w-3.5 h-3.5" />
-                              </button>
-
-                              {isAdmin && onUpdatePassword && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setEditingNoteId(note.id);
-                                    setEditNoteTitle(note.website || '');
-                                    setEditNoteText(note.notes || '');
-                                    setEditNoteMemberId(note.memberId || 'all');
-                                    setEditNoteColor(note.color || 'yellow');
-                                    setIsCreatingNote(false);
-                                  }}
-                                  className="p-1 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 opacity-75 hover:opacity-100 transition-colors cursor-pointer"
-                                  title="Editar clave"
-                                >
-                                  <Edit2 className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-
-                              {isAdmin && onDeletePassword && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (window.confirm(`¿Seguro que deseas eliminar la clave "${note.website}"?`)) {
-                                      onDeletePassword(note.id);
-                                    }
-                                  }}
-                                  className="p-1 rounded-lg hover:bg-red-500/20 text-red-700 dark:text-red-400 transition-colors cursor-pointer"
-                                  title="Eliminar clave"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+              {groupedCategories.length + (showNotesGroup ? 1 : 0) > 1 && (
+                <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                  <button
+                    type="button"
+                    onClick={expandAll}
+                    className="hover:text-red-600 font-bold transition-colors cursor-pointer"
+                  >
+                    Expandir todas
+                  </button>
+                  <span>•</span>
+                  <button
+                    type="button"
+                    onClick={collapseAll}
+                    className="hover:text-red-600 font-bold transition-colors cursor-pointer"
+                  >
+                    Colapsar todas
+                  </button>
                 </div>
               )}
             </div>
-          )}
 
-          {/* ================= REGULAR PERSONAL RECORDS CATEGORY GROUPS ================= */}
-          {groupedCategories.map((group) => {
-            const isExpanded = !!expandedCategories[group.categoryName];
-            const catColor = group.categoryObj?.color || '#dc2626';
-
-            return (
-              <div
-                key={group.categoryName}
-                className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden transition-all"
-              >
-                {/* Category Header Banner */}
-                <div
-                  onClick={() => toggleCategoryExpand(group.categoryName)}
-                  className="px-4 sm:px-5 py-3.5 bg-slate-50/70 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3 cursor-pointer select-none hover:bg-slate-100/70 dark:hover:bg-slate-800/80 transition-colors"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
+            {groupedCategories.length > 0 || showNotesGroup ? (
+              <div className="space-y-4">
+                {/* ================= 🔑 CLAVES POST-IT GROUP ================= */}
+                {showNotesGroup && (
+                  <div className="bg-white dark:bg-slate-900 rounded-3xl border border-amber-200 dark:border-amber-900/60 shadow-2xs overflow-hidden transition-all">
+                    {/* Notas Category Header */}
                     <div
-                      className="w-8 h-8 rounded-xl flex items-center justify-center text-white shrink-0 shadow-xs"
-                      style={{ backgroundColor: catColor }}
+                      onClick={() => toggleCategoryExpand('notas_claves')}
+                      className="px-4 sm:px-5 py-3.5 bg-amber-50/60 dark:bg-amber-950/40 border-b border-amber-100 dark:border-amber-900/60 flex items-center justify-between gap-3 cursor-pointer select-none hover:bg-amber-100/50 dark:hover:bg-amber-950/60 transition-colors"
                     >
-                      {isExpanded ? (
-                        <FolderOpen className="w-4 h-4" />
-                      ) : (
-                        <Folder className="w-4 h-4" />
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white truncate">
-                          {group.categoryName}
-                        </h3>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-black bg-red-50 dark:bg-red-950/50 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/60">
-                          {group.records.length} {group.records.length === 1 ? 'dato' : 'datos'}
-                        </span>
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center shrink-0 shadow-xs font-black">
+                          <StickyNote className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white truncate">
+                              Claves
+                            </h3>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-black bg-amber-200/90 dark:bg-amber-900 text-amber-950 dark:text-amber-200 border border-amber-300 dark:border-amber-800">
+                              {filteredNotes.length}{' '}
+                              {filteredNotes.length === 1 ? 'clave' : 'claves'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {isAdmin && onAddPassword && !isCreatingNote && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIsCreatingNote(true);
+                              setNewNoteMemberId(
+                                selectedMemberId !== 'all' ? selectedMemberId : 'all'
+                              );
+                              setNewNoteColor('yellow');
+                              setNewNoteTitle('');
+                              setNewNoteText('');
+                              setExpandedCategories((prev) => ({ ...prev, notas_claves: true }));
+                            }}
+                            className="px-2.5 py-1 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black flex items-center gap-1 shadow-2xs transition-all cursor-pointer border border-amber-600"
+                            title="Agregar nueva clave"
+                          >
+                            <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                            <span className="hidden sm:inline">Nueva Clave</span>
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                        >
+                          {expandedCategories['notas_claves'] ? (
+                            <ChevronUp className="w-4 h-4" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4" />
+                          )}
+                        </button>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    {/* Admin quick add in this category */}
-                    {isAdmin && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onOpenAddRecord({ category: group.categoryName });
-                        }}
-                        className="px-2.5 py-1 rounded-xl bg-white dark:bg-slate-900 text-red-600 border border-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 text-xs font-bold flex items-center gap-1 shadow-2xs transition-all cursor-pointer"
-                        title={`Agregar dato en ${group.categoryName}`}
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">Agregar</span>
-                      </button>
+                    {/* Notas Body: Grid of Post-it Cards */}
+                    {!!expandedCategories['notas_claves'] && (
+                      <div className="p-3 sm:p-4 bg-amber-50/20 dark:bg-amber-950/10">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {isCreatingNote && (
+                            <div
+                              className={`relative rounded-3xl p-4 border-2 border-dashed flex flex-col justify-between transition-all duration-200 shadow-xl ${
+                                THEMES_MAP[newNoteColor]?.card || THEMES_MAP.yellow.card
+                              }`}
+                            >
+                              <div
+                                className={`w-20 h-3.5 mx-auto -mt-6 mb-2 rounded-xs backdrop-blur-md opacity-85 rotate-[-0.5deg] shadow-2xs ${
+                                  THEMES_MAP[newNoteColor]?.tape || THEMES_MAP.yellow.tape
+                                }`}
+                              />
+
+                              <div className="space-y-2.5 flex-1">
+                                <div className="flex items-center justify-between gap-1.5 flex-wrap pb-1.5 border-b border-black/10 dark:border-white/10">
+                                  <div className="flex items-center gap-1">
+                                    {POSTIT_COLORS.map((c) => (
+                                      <button
+                                        key={c.id}
+                                        type="button"
+                                        onClick={() => setNewNoteColor(c.id)}
+                                        className={`w-4 h-4 rounded-full border border-black/20 cursor-pointer ${c.dotClass} ${
+                                          newNoteColor === c.id
+                                            ? 'scale-125 ring-2 ring-slate-950 dark:ring-white'
+                                            : 'opacity-70'
+                                        }`}
+                                        title={c.name}
+                                      />
+                                    ))}
+                                  </div>
+
+                                  <select
+                                    value={newNoteMemberId}
+                                    onChange={(e) => {
+                                      const mid = e.target.value;
+                                      setNewNoteMemberId(mid);
+                                      if (mid !== 'all') {
+                                        const mObj = members.find((m) => m.id === mid);
+                                        setNewNoteColor(getMemberPostitColor(mObj, mid));
+                                      }
+                                    }}
+                                    className="text-[11px] font-bold bg-white/70 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-lg px-1.5 py-0.5 outline-none cursor-pointer"
+                                  >
+                                    <option value="all">👥 Familia</option>
+                                    {members.map((m) => (
+                                      <option key={m.id} value={m.id}>
+                                        👤 {m.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <input
+                                  ref={noteTitleInputRef}
+                                  type="text"
+                                  value={newNoteTitle}
+                                  onChange={(e) => setNewNoteTitle(e.target.value)}
+                                  placeholder="Título de la clave..."
+                                  className="w-full px-2.5 py-1.5 text-xs sm:text-sm font-black bg-white/60 dark:bg-black/30 border border-black/10 dark:border-white/10 rounded-xl placeholder-slate-500/70 outline-none"
+                                  onKeyDown={(e) => {
+                                    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                                      handleSaveNewNote();
+                                    }
+                                  }}
+                                />
+
+                                <textarea
+                                  rows={3}
+                                  value={newNoteText}
+                                  onChange={(e) => setNewNoteText(e.target.value)}
+                                  placeholder="Escribe aquí tu clave..."
+                                  className="w-full px-2.5 py-1.5 text-xs bg-white/60 dark:bg-black/30 border border-black/10 dark:border-white/10 rounded-xl placeholder-slate-500/70 outline-none resize-none"
+                                  onKeyDown={(e) => {
+                                    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                                      handleSaveNewNote();
+                                    }
+                                  }}
+                                />
+                              </div>
+
+                              <div className="pt-2 mt-2 border-t border-black/10 dark:border-white/10 flex items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => setIsCreatingNote(false)}
+                                  className="px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-black/10 cursor-pointer"
+                                >
+                                  Cancelar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleSaveNewNote}
+                                  disabled={!newNoteTitle.trim() && !newNoteText.trim()}
+                                  className="px-3 py-1 rounded-lg text-xs font-black bg-slate-950 text-white dark:bg-white dark:text-slate-950 cursor-pointer shadow-xs disabled:opacity-40"
+                                >
+                                  Guardar
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Existing Notes */}
+                          {filteredNotes.map((note) => {
+                            const isEditing = editingNoteId === note.id;
+                            const memberColor =
+                              note.memberId && note.memberId !== 'all'
+                                ? getMemberPostitColor(
+                                    members.find((m) => m.id === note.memberId),
+                                    note.memberId
+                                  )
+                                : note.color || 'yellow';
+                            const colorKey = THEMES_MAP[memberColor]
+                              ? memberColor
+                              : THEMES_MAP[note.color || '']
+                              ? note.color!
+                              : 'yellow';
+                            const theme = THEMES_MAP[colorKey] || THEMES_MAP.yellow;
+                            const isCopied = copiedNoteId === `datos_note_${note.id}`;
+                            const webUrl = formatWebsiteUrl(note.website);
+
+                            if (isEditing) {
+                              const editTheme = THEMES_MAP[editNoteColor] || theme;
+                              return (
+                                <div
+                                  key={note.id}
+                                  className={`relative rounded-3xl p-4 border-2 border-amber-400 flex flex-col justify-between transition-all duration-200 shadow-xl ${editTheme.card}`}
+                                >
+                                  <div
+                                    className={`w-20 h-3.5 mx-auto -mt-6 mb-2 rounded-xs backdrop-blur-md opacity-85 rotate-[-0.5deg] shadow-2xs ${editTheme.tape}`}
+                                  />
+
+                                  <div className="space-y-2.5 flex-1">
+                                    <div className="flex items-center justify-between gap-1.5 flex-wrap pb-1.5 border-b border-black/10 dark:border-white/10">
+                                      <div className="flex items-center gap-1">
+                                        {POSTIT_COLORS.map((c) => (
+                                          <button
+                                            key={c.id}
+                                            type="button"
+                                            onClick={() => setEditNoteColor(c.id)}
+                                            className={`w-4 h-4 rounded-full border border-black/20 cursor-pointer ${c.dotClass} ${
+                                              editNoteColor === c.id
+                                                ? 'scale-125 ring-2 ring-slate-950 dark:ring-white'
+                                                : 'opacity-70'
+                                            }`}
+                                            title={c.name}
+                                          />
+                                        ))}
+                                      </div>
+
+                                      <select
+                                        value={editNoteMemberId}
+                                        onChange={(e) => {
+                                          const mid = e.target.value;
+                                          setEditNoteMemberId(mid);
+                                          if (mid !== 'all') {
+                                            const mObj = members.find((m) => m.id === mid);
+                                            setEditNoteColor(getMemberPostitColor(mObj, mid));
+                                          }
+                                        }}
+                                        className="text-[11px] font-bold bg-white/70 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-lg px-1.5 py-0.5 outline-none cursor-pointer"
+                                      >
+                                        <option value="all">👥 Familia</option>
+                                        {members.map((m) => (
+                                          <option key={m.id} value={m.id}>
+                                            👤 {m.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+
+                                    <input
+                                      type="text"
+                                      value={editNoteTitle}
+                                      onChange={(e) => setEditNoteTitle(e.target.value)}
+                                      placeholder="Título de la clave..."
+                                      className="w-full px-2.5 py-1.5 text-xs sm:text-sm font-black bg-white/60 dark:bg-black/30 border border-black/10 dark:border-white/10 rounded-xl outline-none"
+                                    />
+
+                                    <textarea
+                                      rows={3}
+                                      value={editNoteText}
+                                      onChange={(e) => setEditNoteText(e.target.value)}
+                                      placeholder="Escribe aquí tu clave..."
+                                      className="w-full px-2.5 py-1.5 text-xs bg-white/60 dark:bg-black/30 border border-black/10 dark:border-white/10 rounded-xl outline-none resize-none"
+                                    />
+                                  </div>
+
+                                  <div className="pt-2 mt-2 border-t border-black/10 dark:border-white/10 flex items-center justify-end gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditingNoteId(null)}
+                                      className="px-2.5 py-1 rounded-lg text-xs font-bold hover:bg-black/10 cursor-pointer"
+                                    >
+                                      Cancelar
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSaveEditNote(note.id)}
+                                      disabled={!editNoteTitle.trim() && !editNoteText.trim()}
+                                      className="px-3 py-1 rounded-lg text-xs font-black bg-slate-950 text-white dark:bg-white dark:text-slate-950 cursor-pointer shadow-xs disabled:opacity-40"
+                                    >
+                                      Guardar
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <div
+                                key={note.id}
+                                className={`relative rounded-3xl p-4 border transition-all duration-200 hover:-translate-y-1 hover:shadow-lg flex flex-col justify-between group ${theme.card}`}
+                              >
+                                <div
+                                  className={`w-20 h-3.5 mx-auto -mt-6 mb-2 rounded-xs backdrop-blur-md opacity-85 rotate-[-0.5deg] shadow-2xs ${theme.tape}`}
+                                />
+
+                                <div className="space-y-1.5 flex-1 pt-1">
+                                  <div className="flex items-start justify-between gap-1">
+                                    <h4 className="text-xs sm:text-sm font-black tracking-tight leading-snug break-words">
+                                      {note.website}
+                                    </h4>
+                                    {webUrl && (
+                                      <a
+                                        href={webUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="p-0.5 rounded opacity-70 hover:opacity-100 shrink-0"
+                                      >
+                                        <ExternalLink className="w-3 h-3" />
+                                      </a>
+                                    )}
+                                  </div>
+
+                                  {isTableContent(note.notes) ? (
+                                    <div className="pt-1">
+                                      <ExcelTableViewer
+                                        table={parseTableContent(note.notes)!}
+                                        title={note.website}
+                                        themeId={note.color}
+                                        compact
+                                      />
+                                    </div>
+                                  ) : note.notes ? (
+                                    <div className="p-2.5 rounded-xl bg-white/40 dark:bg-black/20 border border-black/5 dark:border-white/5">
+                                      <p className="text-[11px] sm:text-xs whitespace-pre-wrap leading-relaxed font-sans select-text">
+                                        {note.notes}
+                                      </p>
+                                    </div>
+                                  ) : null}
+                                </div>
+
+                                <div className="pt-2 mt-2 border-t border-black/10 dark:border-white/10 flex items-center justify-between gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      let full = '';
+                                      if (isTableContent(note.notes)) {
+                                        const parsed = parseTableContent(note.notes);
+                                        if (parsed) full = tableToTSV(parsed);
+                                      }
+                                      if (!full) {
+                                        full = `${
+                                          note.website ? `🔑 ${note.website}\n\n` : ''
+                                        }${note.notes || ''}`.trim();
+                                      }
+                                      handleCopyNote(full, `datos_note_${note.id}`);
+                                    }}
+                                    className={`px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer bg-white/40 dark:bg-black/20 ${theme.actionHover}`}
+                                    title={
+                                      isTableContent(note.notes)
+                                        ? 'Copiar tabla en formato Excel'
+                                        : 'Copiar clave'
+                                    }
+                                  >
+                                    {isCopied ? (
+                                      <>
+                                        <Check className="w-2.5 h-2.5 text-emerald-700 dark:text-emerald-400 stroke-[3]" />
+                                        <span>¡Copiado!</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Copy className="w-2.5 h-2.5 opacity-75" />
+                                        <span>
+                                          {isTableContent(note.notes) ? 'Copiar Tabla' : 'Copiar'}
+                                        </span>
+                                      </>
+                                    )}
+                                  </button>
+
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleShareNoteWhatsApp(note)}
+                                      className="p-1 rounded-lg hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 transition-colors cursor-pointer"
+                                      title="Compartir por WhatsApp"
+                                    >
+                                      <Share2 className="w-3.5 h-3.5" />
+                                    </button>
+
+                                    {isAdmin && onUpdatePassword && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setEditingNoteId(note.id);
+                                          setEditNoteTitle(note.website || '');
+                                          setEditNoteText(note.notes || '');
+                                          setEditNoteMemberId(note.memberId || 'all');
+                                          setEditNoteColor(note.color || 'yellow');
+                                          setIsCreatingNote(false);
+                                        }}
+                                        className="p-1 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 opacity-75 hover:opacity-100 transition-colors cursor-pointer"
+                                        title="Editar clave"
+                                      >
+                                        <Edit2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
+
+                                    {isAdmin && onDeletePassword && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (
+                                            window.confirm(
+                                              `¿Seguro que deseas eliminar la clave "${note.website}"?`
+                                            )
+                                          ) {
+                                            onDeletePassword(note.id);
+                                          }
+                                        }}
+                                        className="p-1 rounded-lg hover:bg-red-500/20 text-red-700 dark:text-red-400 transition-colors cursor-pointer"
+                                        title="Eliminar clave"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
                     )}
-
-                    {/* Chevron expand/collapse */}
-                    <button
-                      type="button"
-                      className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
-                    >
-                      {isExpanded ? (
-                        <ChevronUp className="w-4 h-4" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Group Body: Grid of Records in this Category */}
-                {isExpanded && (
-                  <div className="p-3 sm:p-4 bg-slate-50/30 dark:bg-slate-950/20">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                      {group.records.map((record) => {
-                        const member = members.find((m) => m.id === record.memberId);
-                        return (
-                          <PersonalRecordCard
-                            key={record.id}
-                            record={record}
-                            member={member}
-                            isAdmin={isAdmin}
-                            onEdit={onEditRecord}
-                            onDelete={onDeleteRecord}
-                            onViewPhoto={onViewPhoto}
-                            onSendRecord={onOpenSendRecord}
-                            onUpdateRecordTodos={onUpdateRecordTodos}
-                          />
-                        );
-                      })}
-                    </div>
                   </div>
                 )}
+
+                {/* ================= REGULAR PERSONAL RECORDS CATEGORY GROUPS ================= */}
+                {groupedCategories.map((group) => {
+                  const isExpanded = !!expandedCategories[group.categoryName];
+                  const catColor = group.categoryObj?.color || '#dc2626';
+
+                  return (
+                    <div
+                      key={group.categoryName}
+                      className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden transition-all"
+                    >
+                      <div
+                        onClick={() => toggleCategoryExpand(group.categoryName)}
+                        className="px-4 sm:px-5 py-3.5 bg-slate-50/70 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3 cursor-pointer select-none hover:bg-slate-100/70 dark:hover:bg-slate-800/80 transition-colors"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div
+                            className="w-8 h-8 rounded-xl flex items-center justify-center text-white shrink-0 shadow-xs"
+                            style={{ backgroundColor: catColor }}
+                          >
+                            {isExpanded ? (
+                              <FolderOpen className="w-4 h-4" />
+                            ) : (
+                              <Folder className="w-4 h-4" />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white truncate">
+                                {group.categoryName}
+                              </h3>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-black bg-red-50 dark:bg-red-950/50 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/60">
+                                {group.records.length}{' '}
+                                {group.records.length === 1 ? 'dato' : 'datos'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          {isAdmin && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onOpenAddRecord({ category: group.categoryName });
+                              }}
+                              className="px-2.5 py-1 rounded-xl bg-white dark:bg-slate-900 text-red-600 border border-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 text-xs font-bold flex items-center gap-1 shadow-2xs transition-all cursor-pointer"
+                              title={`Agregar dato en ${group.categoryName}`}
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              <span className="hidden sm:inline">Agregar</span>
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                          >
+                            {isExpanded ? (
+                              <ChevronUp className="w-4 h-4" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      {isExpanded && (
+                        <div className="p-3 sm:p-4 bg-slate-50/30 dark:bg-slate-950/20">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                            {group.records.map((record) => {
+                              const member = members.find((m) => m.id === record.memberId);
+                              return (
+                                <PersonalRecordCard
+                                  key={record.id}
+                                  record={record}
+                                  member={member}
+                                  isAdmin={isAdmin}
+                                  onEdit={onEditRecord}
+                                  onDelete={onDeleteRecord}
+                                  onViewPhoto={onViewPhoto}
+                                  onSendRecord={onOpenSendRecord}
+                                  onUpdateRecordTodos={onUpdateRecordTodos}
+                                />
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
-        </div>
-      ) : (
-        /* Empty State */
-        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-8 text-center space-y-3">
-          <div className="w-12 h-12 rounded-2xl bg-red-50 dark:bg-red-950/40 text-red-600 flex items-center justify-center mx-auto border border-red-200">
-            <Folder className="w-6 h-6" />
+            ) : (
+              <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-8 text-center space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-red-50 dark:bg-red-950/40 text-red-600 flex items-center justify-center mx-auto border border-red-200">
+                  <Folder className="w-6 h-6" />
+                </div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  No se encontraron datos personales ni claves
+                </h3>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                  {selectedCategory !== 'all'
+                    ? `No hay datos registrados en la categoría seleccionada.`
+                    : 'Aún no hay documentos ni claves registradas para este filtro.'}
+                </p>
+                {isAdmin && (
+                  <button
+                    onClick={() =>
+                      onOpenAddRecord(
+                        selectedCategory !== 'all' && selectedCategory !== 'notas_claves'
+                          ? { category: selectedCategory }
+                          : undefined
+                      )
+                    }
+                    className="px-4 py-2 rounded-2xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer shadow-md"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Agregar primer dato</span>
+                  </button>
+                )}
+              </div>
+            )}
           </div>
-          <h3 className="text-base font-bold text-slate-900 dark:text-white">
-            No se encontraron datos personales ni notas
-          </h3>
-          <p className="text-xs text-slate-500 max-w-sm mx-auto">
-            {selectedCategory !== 'all'
-              ? `No hay datos registrados en la categoría seleccionada.`
-              : 'Aún no hay documentos ni notas registradas.'}
-          </p>
-          {isAdmin && (
-            <button
-              onClick={() => onOpenAddRecord(selectedCategory !== 'all' && selectedCategory !== 'notas_claves' ? { category: selectedCategory } : undefined)}
-              className="px-4 py-2 rounded-2xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer shadow-md"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Agregar primer dato</span>
-            </button>
-          )}
-        </div>
-      )}
         </div>
       </div>
     </div>

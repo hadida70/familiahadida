@@ -1,19 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Plus,
   ShoppingCart,
   FileText,
   Calendar as CalendarIcon,
   Phone,
   Bell,
-  Layers,
   Lock,
   CheckSquare,
   Key,
   StickyNote,
 } from 'lucide-react';
 import { useWebSocket } from './lib/useWebSocket';
-import { GroceryItem, CustomList, PersonalRecord, CalendarTask, Contact, Member, TodoItem, PasswordItem } from './types';
+import { GroceryItem, CustomList, PersonalRecord, CalendarTask, Contact, Member } from './types';
 import { Header } from './components/Header';
 import { ListAccordion } from './components/ListAccordion';
 import { NotificationBanner } from './components/NotificationBanner';
@@ -30,7 +28,6 @@ import { ManageDataCategoriesModal } from './components/ManageDataCategoriesModa
 import { CategoriesAdminView } from './components/CategoriesAdminView';
 import { SendPersonalRecordModal } from './components/SendPersonalRecordModal';
 import { PhotoLightboxModal } from './components/PhotoLightboxModal';
-import { MonthlyCalendarView } from './components/MonthlyCalendarView';
 import { ContactsDirectoryView } from './components/ContactsDirectoryView';
 import { AddContactModal } from './components/AddContactModal';
 import { PinLockScreen } from './components/PinLockScreen';
@@ -45,7 +42,6 @@ export default function App() {
     connected,
     activeMember,
     setActiveMember,
-    token,
     login,
     logout,
     uploadFile,
@@ -57,7 +53,6 @@ export default function App() {
     updateList,
     deleteList,
     addMember,
-    deleteMember,
     addPersonalRecord,
     updatePersonalRecord,
     deletePersonalRecord,
@@ -82,7 +77,6 @@ export default function App() {
     deletePassword,
     sendPushAlert,
     markNotificationsRead,
-    resetDemoData,
     recentToast,
     clearToast,
     pushPermission,
@@ -91,7 +85,10 @@ export default function App() {
 
   // Authentication & Role State
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return localStorage.getItem('hadida_family_auth') === 'authenticated' && !!localStorage.getItem('hadida_family_auth_token');
+    return (
+      localStorage.getItem('hadida_family_auth') === 'authenticated' &&
+      !!localStorage.getItem('hadida_family_auth_token')
+    );
   });
 
   const [authRole, setAuthRole] = useState<'admin' | 'member'>(() => {
@@ -99,10 +96,15 @@ export default function App() {
   });
 
   const [isAdminPinPromptOpen, setIsAdminPinPromptOpen] = useState(false);
-  const isAdmin = authRole === 'admin' || activeMember?.role === 'admin' || activeMember?.name?.toUpperCase() === 'JAIME';
+  const isAdmin =
+    authRole === 'admin' ||
+    activeMember?.role === 'admin' ||
+    activeMember?.name?.toUpperCase() === 'JAIME';
 
-  // Navigation tab: 'calendar' (Home screen default), 'lists', 'personal_data', 'categories', 'contacts', 'todos', 'passwords'
-  const [activeTab, setActiveTab] = useState<'calendar' | 'lists' | 'personal_data' | 'categories' | 'contacts' | 'todos' | 'passwords'>('calendar');
+  // Navigation tab: 'calendar' (Unified Home: Calendario + Datos), 'lists', 'personal_data', 'categories', 'contacts', 'todos', 'passwords'
+  const [activeTab, setActiveTab] = useState<
+    'calendar' | 'lists' | 'personal_data' | 'categories' | 'contacts' | 'todos' | 'passwords'
+  >('calendar');
 
   // Modals state for Lists and Members
   const [isAddItemOpen, setIsAddItemOpen] = useState(false);
@@ -116,17 +118,18 @@ export default function App() {
 
   // Personal Records Modals & Lightbox
   const [isAddPersonalRecordOpen, setIsAddPersonalRecordOpen] = useState(false);
-  const [addRecordPreset, setAddRecordPreset] = useState<{ category?: string; subcategory?: string } | null>(null);
+  const [addRecordPreset, setAddRecordPreset] = useState<{
+    category?: string;
+    subcategory?: string;
+  } | null>(null);
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
   const [isSendPersonalRecordOpen, setIsSendPersonalRecordOpen] = useState(false);
   const [sendingPersonalRecord, setSendingPersonalRecord] = useState<PersonalRecord | null>(null);
   const [editingPersonalRecord, setEditingPersonalRecord] = useState<PersonalRecord | null>(null);
-  const [viewingPhotoState, setViewingPhotoState] = useState<{ record: PersonalRecord; initialIndex: number } | null>(null);
-
-  // Calendar Tasks Modals
-  const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
-  const [editingTask, setEditingTask] = useState<CalendarTask | null>(null);
-  const [defaultTaskDate, setDefaultTaskDate] = useState<string | undefined>(undefined);
+  const [viewingPhotoState, setViewingPhotoState] = useState<{
+    record: PersonalRecord;
+    initialIndex: number;
+  } | null>(null);
 
   // Contacts Directory Modals
   const [isAddContactOpen, setIsAddContactOpen] = useState(false);
@@ -140,7 +143,7 @@ export default function App() {
   const [activeListId, setActiveListId] = useState<string>('list_supermercado');
 
   // Font size setting (for elderly readability)
-  const [fontSize, setFontSize] = useState<'normal' | 'large' | 'xlarge'>('normal');
+  const [fontSize] = useState<'normal' | 'large' | 'xlarge'>('normal');
 
   // Sync activeMember from saved storage if available
   useEffect(() => {
@@ -199,7 +202,9 @@ export default function App() {
   };
 
   // Tab switching with PIN requirement for Passwords section
-  const handleSelectTab = (tab: 'calendar' | 'lists' | 'personal_data' | 'categories' | 'contacts' | 'todos' | 'passwords') => {
+  const handleSelectTab = (
+    tab: 'calendar' | 'lists' | 'personal_data' | 'categories' | 'contacts' | 'todos' | 'passwords'
+  ) => {
     if (tab === 'passwords') {
       if (isPasswordUnlocked && activeTab === 'passwords') {
         return;
@@ -266,28 +271,6 @@ export default function App() {
     setIsAddPersonalRecordOpen(true);
   };
 
-  // Calendar Tasks Handlers
-  const handleOpenAddTask = (date?: string) => {
-    setEditingTask(null);
-    setDefaultTaskDate(date || new Date().toISOString().split('T')[0]);
-    setIsAddTaskOpen(true);
-  };
-
-  const handleEditTask = (task: CalendarTask) => {
-    setEditingTask(task);
-    setDefaultTaskDate(task.date);
-    setIsAddTaskOpen(true);
-  };
-
-  const handleSaveTask = (taskData: Partial<CalendarTask>) => {
-    if (editingTask) {
-      updateTask(editingTask.id, taskData);
-      setEditingTask(null);
-    } else {
-      addTask(taskData);
-    }
-  };
-
   const handleToggleTaskComplete = (task: CalendarTask) => {
     updateTask(task.id, { completed: !task.completed });
   };
@@ -321,7 +304,6 @@ export default function App() {
     }
   };
 
-
   // If app is not authenticated, show PIN lock screen
   if (!isAuthenticated) {
     return (
@@ -335,13 +317,12 @@ export default function App() {
   }
 
   const totalPersonalRecords = data.personalRecords ? data.personalRecords.length : 0;
-  const totalCategories = data.dataCategories ? data.dataCategories.length : 0;
   const totalTasks = data.calendarTasks ? data.calendarTasks.length : 0;
   const totalContacts = data.contacts ? data.contacts.length : 0;
-  const totalTodos = data.todos ? data.todos.length : 0;
   const pendingTodos = data.todos ? data.todos.filter((t) => !t.completed).length : 0;
   const totalPasswords = data.passwords ? data.passwords.length : 0;
   const totalItems = data.items ? data.items.filter((i) => !i.completed).length : 0;
+  const isUnifiedHomeActive = activeTab === 'calendar' || activeTab === 'personal_data';
 
   return (
     <div
@@ -358,30 +339,31 @@ export default function App() {
         onRequestAdminUnlock={handleElevateToAdmin}
       />
 
-      {/* Main Tab Navigation: Calendario (Home), Listas, Datos, Categorías, Contactos */}
+      {/* Main Tab Navigation: Calendario y Datos (Inicio), Listas, Contactos, To-Do, Claves */}
       <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xs border-b border-slate-200 dark:border-slate-800 sticky top-14 sm:top-16 z-20 shadow-2xs">
-        <div className="max-w-4xl mx-auto px-4 py-2 flex items-center justify-between gap-2 overflow-x-auto scrollbar-none">
+        <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between gap-2 overflow-x-auto scrollbar-none">
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            {/* Tab: CALENDARIO (Pantalla de inicio) */}
+            {/* Tab: CALENDARIO Y DATOS UNIFICADOS (Pantalla de inicio) */}
             <button
               onClick={() => handleSelectTab('calendar')}
               className={`px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 transition-all cursor-pointer border shrink-0 ${
-                activeTab === 'calendar'
+                isUnifiedHomeActive
                   ? 'bg-white dark:bg-slate-900 text-red-600 border-red-600 shadow-2xs ring-1 ring-red-500/20'
                   : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-transparent hover:bg-slate-200 dark:hover:bg-slate-700'
               }`}
             >
               <CalendarIcon className="w-4 h-4" />
-              <span>CALENDARIO</span>
-              {totalTasks > 0 && (
+              <FileText className="w-4 h-4 -ml-1" />
+              <span>CALENDARIO Y DATOS</span>
+              {totalTasks + totalPersonalRecords > 0 && (
                 <span
                   className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                    activeTab === 'calendar'
+                    isUnifiedHomeActive
                       ? 'bg-red-50 text-red-600 border border-red-200'
                       : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
                   }`}
                 >
-                  {totalTasks}
+                  {totalTasks + totalPersonalRecords}
                 </span>
               )}
             </button>
@@ -406,30 +388,6 @@ export default function App() {
                   }`}
                 >
                   {totalItems}
-                </span>
-              )}
-            </button>
-
-            {/* Tab: DATOS PERSONALES */}
-            <button
-              onClick={() => handleSelectTab('personal_data')}
-              className={`px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 transition-all cursor-pointer border shrink-0 ${
-                activeTab === 'personal_data'
-                  ? 'bg-white dark:bg-slate-900 text-red-600 border-red-600 shadow-2xs ring-1 ring-red-500/20'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-transparent hover:bg-slate-200 dark:hover:bg-slate-700'
-              }`}
-            >
-              <FileText className="w-4 h-4" />
-              <span>DATOS</span>
-              {totalPersonalRecords > 0 && (
-                <span
-                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                    activeTab === 'personal_data'
-                      ? 'bg-red-50 text-red-600 border border-red-200'
-                      : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
-                  }`}
-                >
-                  {totalPersonalRecords}
                 </span>
               )}
             </button>
@@ -530,49 +488,17 @@ export default function App() {
       />
 
       {/* Main Container */}
-      <main className={`mx-auto px-2 sm:px-4 w-full flex-1 mt-4 ${activeTab === 'personal_data' ? 'max-w-7xl' : 'max-w-5xl'}`}>
-        {activeTab === 'calendar' ? (
-          /* CALENDARIO MENSUAL CON OPCIÓN A COLOCAR TAREAS */
-          <MonthlyCalendarView
-            tasks={data.calendarTasks || []}
-            members={data.members}
-            activeMember={activeMember}
-            isAdmin={isAdmin}
-            onAddTask={addTask}
-            onUpdateTask={updateTask}
-            onToggleComplete={handleToggleTaskComplete}
-            onDeleteTask={deleteTask}
-            onSendTaskAlert={handleSendTaskAlert}
-            fontSize={fontSize}
-          />
-        ) : activeTab === 'lists' ? (
-          /* ACCORDION CUSTOM LISTS WITH PRODUCTS */
-          <ListAccordion
-            lists={data.lists}
-            activeListId={activeListId}
-            isAdmin={isAdmin}
-            onSelectList={(id) => {
-              setActiveListId((prev) => (prev === id ? '' : id));
-            }}
-            onOpenCreateList={() => setIsCreateListOpen(true)}
-            onOpenEditList={handleOpenEditList}
-            onDeleteList={deleteList}
-            onOpenAddItem={handleOpenAddItemForList}
-            onOpenShare={handleOpenShareForList}
-            onQuickAddItem={handleQuickAddItem}
-            items={data.items}
-            currentMember={activeMember}
-            members={data.members}
-            onToggleComplete={handleToggleComplete}
-            onReassign={handleReassign}
-            onDeleteItem={deleteItem}
-            fontSize={fontSize}
-          />
-        ) : activeTab === 'personal_data' ? (
-          /* DATOS PERSONALES Y ADJUNTOS VIEW */
+      <main
+        className={`mx-auto px-2 sm:px-4 w-full flex-1 mt-4 ${
+          isUnifiedHomeActive ? 'max-w-7xl' : 'max-w-5xl'
+        }`}
+      >
+        {isUnifiedHomeActive ? (
+          /* VISTA UNIFICADA DE CALENDARIO Y DATOS CON BARRA LATERAL DE INTEGRANTES */
           <PersonalRecordsView
             records={data.personalRecords || []}
             passwords={data.passwords || []}
+            tasks={data.calendarTasks || []}
             members={data.members}
             categories={data.dataCategories || []}
             activeMember={activeMember}
@@ -601,6 +527,35 @@ export default function App() {
             onAddPassword={addPassword}
             onUpdatePassword={updatePassword}
             onDeletePassword={deletePassword}
+            onAddTask={addTask}
+            onUpdateTask={updateTask}
+            onToggleTaskComplete={handleToggleTaskComplete}
+            onDeleteTask={deleteTask}
+            onSendTaskAlert={handleSendTaskAlert}
+            fontSize={fontSize}
+          />
+        ) : activeTab === 'lists' ? (
+          /* ACCORDION CUSTOM LISTS WITH PRODUCTS */
+          <ListAccordion
+            lists={data.lists}
+            activeListId={activeListId}
+            isAdmin={isAdmin}
+            onSelectList={(id) => {
+              setActiveListId((prev) => (prev === id ? '' : id));
+            }}
+            onOpenCreateList={() => setIsCreateListOpen(true)}
+            onOpenEditList={handleOpenEditList}
+            onDeleteList={deleteList}
+            onOpenAddItem={handleOpenAddItemForList}
+            onOpenShare={handleOpenShareForList}
+            onQuickAddItem={handleQuickAddItem}
+            items={data.items}
+            currentMember={activeMember}
+            members={data.members}
+            onToggleComplete={handleToggleComplete}
+            onReassign={handleReassign}
+            onDeleteItem={deleteItem}
+            fontSize={fontSize}
           />
         ) : activeTab === 'categories' ? (
           /* PANEL DE ADMINISTRACIÓN DE CATEGORÍAS Y SUBCATEGORÍAS */
@@ -615,7 +570,7 @@ export default function App() {
             onAddSubcategory={addSubcategory}
             onRenameSubcategory={renameSubcategory}
             onDeleteSubcategory={deleteSubcategory}
-            onNavigateToDataRecords={() => setActiveTab('personal_data')}
+            onNavigateToDataRecords={() => setActiveTab('calendar')}
           />
         ) : activeTab === 'todos' ? (
           /* TO-DO LIST MINIMALISTA */
@@ -828,7 +783,6 @@ export default function App() {
         onSaveContact={handleSaveContact}
         editingContact={editingContact}
       />
-
 
       {/* Admin PIN Prompt Modal */}
       <AdminPinPromptModal
