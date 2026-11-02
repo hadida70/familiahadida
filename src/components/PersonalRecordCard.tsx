@@ -15,6 +15,7 @@ import {
 import { Member, PersonalRecord, RecordAttachment, RecordTodo } from '../types';
 import { CreditCardVisualizer } from './CreditCardVisualizer';
 import { sounds } from '../lib/sound';
+import { getMemberColorTheme } from '../lib/memberColors';
 
 interface PersonalRecordCardProps {
   record: PersonalRecord;
@@ -28,7 +29,6 @@ interface PersonalRecordCardProps {
 }
 
 export const isCreditCardRecord = (record: PersonalRecord) => {
-  // STRICT: Only render credit card visualizer if it explicitly has card credentials saved
   return !!(
     (record.cardNumber && record.cardNumber.trim().length > 0) ||
     (record.cardCvc && record.cardCvc.trim().length > 0) ||
@@ -65,20 +65,30 @@ export const PersonalRecordCard: React.FC<PersonalRecordCardProps> = ({
       : [];
 
   const imageAttachments = attachments.filter(
-    (a) => a.fileType?.startsWith('image/') || (a.fileDataUrl && a.fileDataUrl.startsWith('data:image/'))
+    (a) =>
+      a.fileType?.startsWith('image/') ||
+      (a.fileDataUrl && a.fileDataUrl.startsWith('data:image/'))
   );
 
   const isCard = isCreditCardRecord(record);
   const todos: RecordTodo[] = record.todos || [];
-  const isListRecord = record.recordType === 'list' || (record.recordType !== 'document' && todos.length > 0 && attachments.length === 0);
+  const isListRecord =
+    record.recordType === 'list' ||
+    (record.recordType !== 'document' && todos.length > 0 && attachments.length === 0);
   const completedTodosCount = todos.filter((t) => t.completed).length;
+
+  const memberTheme = getMemberColorTheme(member, record.memberId);
 
   const handleDownloadAttachment = (att: RecordAttachment) => {
     const targetUrl = att.fileUrl || att.fileDataUrl;
     if (targetUrl) {
       const link = document.createElement('a');
       link.href = targetUrl;
-      link.download = att.fileName || `${(record.subcategory || 'documento').toLowerCase().replace(/\s+/g, '_')}`;
+      link.download =
+        att.fileName ||
+        `${(record.title || record.subcategory || 'documento')
+          .toLowerCase()
+          .replace(/\s+/g, '_')}`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -118,23 +128,37 @@ export const PersonalRecordCard: React.FC<PersonalRecordCardProps> = ({
         {/* Header: Title / Subcategory + Actions */}
         <div className="flex items-start justify-between gap-2 mb-3">
           <div className="min-w-0 flex-1">
-            {attachments.length > 0 && (
-              <div className="mb-1">
+            <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+              {member && (
+                <span
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black border ${memberTheme.badge}`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${memberTheme.dot}`} />
+                  <span>{member.name}</span>
+                </span>
+              )}
+
+              {record.subcategory && (
+                <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700">
+                  {record.subcategory}
+                </span>
+              )}
+
+              {attachments.length > 0 && (
                 <span className="text-[10px] font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/50 px-2 py-0.5 rounded-md border border-red-200 dark:border-red-900/60">
                   📎 {attachments.length} {attachments.length === 1 ? 'archivo' : 'archivos'}
                 </span>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* Name / Title of the Record */}
             <h4 className="text-base font-black text-slate-900 dark:text-white leading-tight">
-              {record.subcategory || record.title || 'Dato Personal'}
+              {record.title || record.subcategory || 'Dato Personal'}
             </h4>
           </div>
 
           {/* Card Actions */}
           <div className="flex items-center gap-1 shrink-0 pt-0.5">
-            {/* Send / Share button */}
             {onSendRecord && (
               <button
                 onClick={() => onSendRecord(record)}
@@ -145,7 +169,6 @@ export const PersonalRecordCard: React.FC<PersonalRecordCardProps> = ({
               </button>
             )}
 
-            {/* Admin-only Edit & Delete */}
             {isAdmin && (
               <>
                 <button
@@ -179,7 +202,7 @@ export const PersonalRecordCard: React.FC<PersonalRecordCardProps> = ({
                 cardAtmPin: record.cardAtmPin,
                 cardBank: record.cardBank || record.title || record.subcategory || 'ISRACARD',
                 cardBrand: record.cardBrand,
-                cardTheme: 'isracard_white',
+                cardTheme: (record.cardTheme as any) || 'isracard_white',
               }}
               size="sm"
             />
@@ -202,7 +225,6 @@ export const PersonalRecordCard: React.FC<PersonalRecordCardProps> = ({
         {/* ================= MULTI-DOCUMENT & PHOTO ATTACHMENTS AREA ================= */}
         {attachments.length > 0 && (
           <div className="mb-3.5 space-y-2">
-            {/* Multi-Photo Gallery Preview for 1, 2, or 3+ images */}
             {imageAttachments.length === 1 && (
               <div
                 onClick={() => onViewPhoto(record, attachments.indexOf(imageAttachments[0]))}
@@ -299,11 +321,16 @@ export const PersonalRecordCard: React.FC<PersonalRecordCardProps> = ({
                 return (
                   <div
                     key={att.id || attIdx}
-                    className="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 hover:border-slate-300 transition-colors"
+                    onClick={() => onViewPhoto(record, attIdx)}
+                    className="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 hover:border-red-300 dark:hover:border-red-800 transition-colors cursor-pointer"
                   >
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <div className="w-7 h-7 rounded-lg bg-red-50 dark:bg-red-950/40 text-red-600 flex items-center justify-center shrink-0 border border-red-100 dark:border-red-900">
-                        {isAttImage ? <ImageIcon className="w-3.5 h-3.5" /> : <FileText className="w-3.5 h-3.5" />}
+                        {isAttImage ? (
+                          <ImageIcon className="w-3.5 h-3.5" />
+                        ) : (
+                          <FileText className="w-3.5 h-3.5" />
+                        )}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 flex-wrap">
@@ -322,17 +349,18 @@ export const PersonalRecordCard: React.FC<PersonalRecordCardProps> = ({
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1 shrink-0">
-                      {isAttImage && (
-                        <button
-                          type="button"
-                          onClick={() => onViewPhoto(record, attIdx)}
-                          className="p-1.5 rounded-lg bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:text-red-600 transition-colors cursor-pointer"
-                          title="Ver documento"
-                        >
-                          <Eye className="w-3 h-3" />
-                        </button>
-                      )}
+                    <div
+                      className="flex items-center gap-1 shrink-0"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => onViewPhoto(record, attIdx)}
+                        className="p-1.5 rounded-lg bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:text-red-600 transition-colors cursor-pointer"
+                        title="Ver documento"
+                      >
+                        <Eye className="w-3 h-3" />
+                      </button>
                       <button
                         type="button"
                         onClick={() => handleDownloadAttachment(att)}
@@ -349,27 +377,32 @@ export const PersonalRecordCard: React.FC<PersonalRecordCardProps> = ({
           </div>
         )}
 
-        {/* ================= LISTADO DE ÍTEMS / TO-DO CHECKLIST (SOLO SI TIENE ÍTEMS) ================= */}
+        {/* ================= LISTADO DE ÍTEMS / TO-DO CHECKLIST ================= */}
         {todos.length > 0 && (
-          <div className={`mb-3 p-3.5 rounded-2xl ${
-            isListRecord
-              ? 'bg-amber-50/40 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-800/60'
-              : 'bg-slate-50/70 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/70'
-          } space-y-2.5`}>
-            {/* Checklist Header */}
+          <div
+            className={`mb-3 p-3.5 rounded-2xl ${
+              isListRecord
+                ? 'bg-amber-50/40 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-800/60'
+                : 'bg-slate-50/70 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/70'
+            } space-y-2.5`}
+          >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
-                <ListTodo className={`w-4 h-4 ${isListRecord ? 'text-amber-600 dark:text-amber-400' : 'text-red-500'}`} />
+                <ListTodo
+                  className={`w-4 h-4 ${
+                    isListRecord ? 'text-amber-600 dark:text-amber-400' : 'text-red-500'
+                  }`}
+                />
                 <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
                   {isListRecord ? 'Listado de Ítems:' : 'Tareas To-Do:'}
                 </span>
               </div>
               <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                {completedTodosCount}/{todos.length} {completedTodosCount === 1 ? 'completado' : 'completados'}
+                {completedTodosCount}/{todos.length}{' '}
+                {completedTodosCount === 1 ? 'completado' : 'completados'}
               </span>
             </div>
 
-            {/* Progress Bar if todos exist */}
             <div className="w-full h-1.5 bg-slate-200/80 dark:bg-slate-700/80 rounded-full overflow-hidden">
               <div
                 className="h-full bg-emerald-500 rounded-full transition-all duration-300"
@@ -377,7 +410,6 @@ export const PersonalRecordCard: React.FC<PersonalRecordCardProps> = ({
               />
             </div>
 
-            {/* Checklist items */}
             <div className="space-y-1 pt-0.5">
               {todos.map((todo) => (
                 <div
@@ -405,7 +437,11 @@ export const PersonalRecordCard: React.FC<PersonalRecordCardProps> = ({
                       <Square className="w-3.5 h-3.5 stroke-[2]" />
                     )}
                   </button>
-                  <span className={`flex-1 break-words font-medium ${todo.completed ? 'line-through' : ''}`}>
+                  <span
+                    className={`flex-1 break-words font-medium ${
+                      todo.completed ? 'line-through' : ''
+                    }`}
+                  >
                     {todo.text}
                   </span>
                 </div>
@@ -442,7 +478,9 @@ export const PersonalRecordCard: React.FC<PersonalRecordCardProps> = ({
               className="text-[11px] font-bold text-red-600 hover:underline flex items-center gap-1 cursor-pointer"
             >
               <Paperclip className="w-3 h-3" />
-              <span>{attachments.length} {attachments.length === 1 ? 'doc' : 'docs'}</span>
+              <span>
+                {attachments.length} {attachments.length === 1 ? 'doc' : 'docs'}
+              </span>
             </button>
           )}
         </div>

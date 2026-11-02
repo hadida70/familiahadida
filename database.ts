@@ -344,6 +344,474 @@ export function initDatabase() {
   } catch (err) {
     console.error('Migration check error:', err);
   }
+
+  // Auto-seed documents from ESCANEO PROFESIONAL folder
+  try {
+    seedEscaneoProfesionalDocuments();
+  } catch (err) {
+    console.error('Error seeding ESCANEO PROFESIONAL documents:', err);
+  }
+}
+
+function seedEscaneoProfesionalDocuments() {
+  const escaneoDir = path.join(process.cwd(), 'ESCANEO PROFESIONAL');
+  if (!fs.existsSync(escaneoDir)) return;
+
+  const copyEscaneoFile = (relPath: string, destFileName: string, label?: string) => {
+    const srcPath = path.join(escaneoDir, relPath);
+    if (!fs.existsSync(srcPath)) return null;
+    const destPath = path.join(UPLOADS_DIR, destFileName);
+    const stat = fs.statSync(srcPath);
+    if (!fs.existsSync(destPath) || fs.statSync(destPath).size !== stat.size) {
+      fs.copyFileSync(srcPath, destPath);
+    }
+    return {
+      id: 'att_' + destFileName.replace(/[^a-zA-Z0-9]/g, '_'),
+      fileName: path.basename(relPath),
+      fileType: 'application/pdf',
+      fileSize: stat.size,
+      fileUrl: `/uploads/${destFileName}`,
+      fileDataUrl: '',
+      label: label || undefined,
+    };
+  };
+
+  const docsToSeed: Array<{
+    id: string;
+    memberId: string;
+    category: string;
+    subcategory: string;
+    title: string;
+    notes: string;
+    recordType?: 'document' | 'card' | 'list';
+    files: Array<{ relPath: string; destName: string; label?: string }>;
+    cardNumber?: string;
+    cardHolder?: string;
+    cardExp?: string;
+    cardCvc?: string;
+    cardBank?: string;
+    cardBrand?: string;
+    cardTheme?: string;
+    cardAccountNo?: string;
+  }> = [
+    // ================= JAIME =================
+    {
+      id: 'escaneo_jaime_cedula_ve',
+      memberId: 'member_jaime',
+      category: 'Documentos de Identidad',
+      subcategory: 'Cédula',
+      title: 'Cédula de Identidad (Venezuela) - Jaime',
+      notes: 'Cédula de Identidad venezolana escaneada de Jaime Hadida.',
+      files: [{ relPath: 'JAIME DOC/CEDULA JAIME VE.pdf', destName: 'escaneo_cedula_jaime_ve.pdf', label: 'Cédula VE' }],
+    },
+    {
+      id: 'escaneo_jaime_pasaporte_es',
+      memberId: 'member_jaime',
+      category: 'Documentos de Identidad',
+      subcategory: 'Pasaporte',
+      title: 'Pasaporte (España) - Jaime',
+      notes: 'Pasaporte español escaneado de Jaime Hadida.',
+      files: [{ relPath: 'JAIME DOC/PASAPORTE JAIME ES.pdf', destName: 'escaneo_pasaporte_jaime_es.pdf', label: 'Pasaporte ES' }],
+    },
+    {
+      id: 'escaneo_jaime_pasaporte_il',
+      memberId: 'member_jaime',
+      category: 'Documentos de Identidad',
+      subcategory: 'Pasaporte',
+      title: 'Pasaporte (Israel) - Jaime',
+      notes: 'Pasaporte israelí (Darkon) escaneado de Jaime Hadida.',
+      files: [{ relPath: 'JAIME DOC/PASAPORTE JAIME IL.pdf', destName: 'escaneo_pasaporte_jaime_il.pdf', label: 'Pasaporte IL' }],
+    },
+    {
+      id: 'escaneo_jaime_pasaporte_ve',
+      memberId: 'member_jaime',
+      category: 'Documentos de Identidad',
+      subcategory: 'Pasaporte',
+      title: 'Pasaporte (Venezuela) - Jaime',
+      notes: 'Pasaporte venezolano escaneado de Jaime Hadida.',
+      files: [{ relPath: 'JAIME DOC/PASAPORTE JAIME VE.pdf', destName: 'escaneo_pasaporte_jaime_ve.pdf', label: 'Pasaporte VE' }],
+    },
+    {
+      id: 'escaneo_jaime_gaceta_ve',
+      memberId: 'member_jaime',
+      category: 'Documentos de Identidad',
+      subcategory: 'Visas / Residencia / Teudat Zehut',
+      title: 'Gaceta Oficial de Naturalización (Venezuela) - Jaime',
+      notes: 'Gaceta Oficial de la República de Venezuela.',
+      files: [{ relPath: 'JAIME DOC/GACETA VE.pdf', destName: 'escaneo_gaceta_jaime_ve.pdf', label: 'Gaceta Oficial VE' }],
+    },
+    {
+      id: 'escaneo_jaime_diploma',
+      memberId: 'member_jaime',
+      category: 'Educación y Títulos',
+      subcategory: 'Títulos y Diplomas',
+      title: 'Diploma Profesional - Jaime',
+      notes: 'Título / Diploma académico y profesional de Jaime Hadida.',
+      files: [{ relPath: 'JAIME DOC/DIPLOMA JAIME.pdf', destName: 'escaneo_diploma_jaime.pdf', label: 'Diploma' }],
+    },
+    {
+      id: 'escaneo_jaime_licencia_yaris',
+      memberId: 'member_jaime',
+      category: 'Vehículos y Transporte',
+      subcategory: 'Matrícula y Placas',
+      title: 'Licencia de Vehículo (Rishayon Rejev) Toyota Yaris HEV - Jaime',
+      notes: 'Matrícula / Permiso de circulación israelí (רישיון רכב) Toyota Yaris HEV · Placa: 71-972-204 · Titular: Chaim (Jaime) Hadida (30394358-3).',
+      files: [{ relPath: 'LICENCIA YARIS.pdf', destName: 'escaneo_licencia_yaris.pdf', label: 'Rishayon Rejev Yaris' }],
+    },
+
+    // ================= SOFI =================
+    {
+      id: 'escaneo_sofi_licencia',
+      memberId: 'member_sofi',
+      category: 'Documentos de Identidad',
+      subcategory: 'Licencia de Conducir',
+      title: 'Licencia de Conducir - Sofi',
+      notes: 'Licencia de conducir escaneada de Sofi.',
+      files: [{ relPath: 'SOFI DOC/LICENCIA SOFI.pdf', destName: 'escaneo_licencia_sofi.pdf', label: 'Licencia' }],
+    },
+    {
+      id: 'escaneo_sofi_partida_nac',
+      memberId: 'member_sofi',
+      category: 'Documentos de Identidad',
+      subcategory: 'Partida de Nacimiento',
+      title: 'Partida de Nacimiento (Venezuela) - Sofi',
+      notes: 'Partida de Nacimiento original de Sofi Estela Hassin Pinhas.',
+      files: [{ relPath: 'SOFI DOC/PARTIDA NAC SOFI.pdf', destName: 'escaneo_partida_nac_sofi.pdf', label: 'Partida Nacimiento' }],
+    },
+    {
+      id: 'escaneo_sofi_pasaporte_es',
+      memberId: 'member_sofi',
+      category: 'Documentos de Identidad',
+      subcategory: 'Pasaporte',
+      title: 'Pasaporte (España) - Sofi',
+      notes: 'Pasaporte español escaneado de Sofi.',
+      files: [{ relPath: 'SOFI DOC/PASAPORTE SOFI ES.pdf', destName: 'escaneo_pasaporte_sofi_es.pdf', label: 'Pasaporte ES' }],
+    },
+    {
+      id: 'escaneo_sofi_pasaporte_il',
+      memberId: 'member_sofi',
+      category: 'Documentos de Identidad',
+      subcategory: 'Pasaporte',
+      title: 'Pasaporte (Israel) - Sofi',
+      notes: 'Pasaporte israelí (Darkon) escaneado de Sofi.',
+      files: [{ relPath: 'SOFI DOC/PASAPORTE SOFI IL.pdf', destName: 'escaneo_pasaporte_sofi_il.pdf', label: 'Pasaporte IL' }],
+    },
+    {
+      id: 'escaneo_sofi_pasaporte_ve',
+      memberId: 'member_sofi',
+      category: 'Documentos de Identidad',
+      subcategory: 'Pasaporte',
+      title: 'Pasaporte (Venezuela) - Sofi',
+      notes: 'Pasaporte venezolano escaneado de Sofi.',
+      files: [{ relPath: 'SOFI DOC/PASAPORTE SOFI VE.pdf', destName: 'escaneo_pasaporte_sofi_ve.pdf', label: 'Pasaporte VE' }],
+    },
+    {
+      id: 'escaneo_sofi_teudat_zeut',
+      memberId: 'member_sofi',
+      category: 'Documentos de Identidad',
+      subcategory: 'Visas / Residencia / Teudat Zehut',
+      title: 'Teudat Zehut y Sefaj (Israel) - Sofi',
+      notes: 'Documento de identidad israelí (Teudat Zehut frente, dorso y anexo Sefaj) de Sofi.',
+      files: [
+        { relPath: 'SOFI DOC/TEUDAT ZEUT SOFI.pdf', destName: 'escaneo_teudat_zeut_sofi_1.pdf', label: 'Teudat Zehut 1' },
+        { relPath: 'SOFI DOC/TEUDAT ZEUT SOFI 2.pdf', destName: 'escaneo_teudat_zeut_sofi_2.pdf', label: 'Teudat Zehut 2' },
+        { relPath: 'SOFI DOC/ZEFAJ SOFI.pdf', destName: 'escaneo_zefaj_sofi.pdf', label: 'Sefaj' },
+      ],
+    },
+    {
+      id: 'escaneo_sofi_expediente_ve',
+      memberId: 'member_sofi',
+      category: 'Documentos de Identidad',
+      subcategory: 'Pasaporte',
+      title: 'Expediente Documentos Venezuela (Pasaporte, Cédula, Partida y Cita) - Sofi',
+      notes: 'Compilación de documentos de Sofi Estela Hassin Pinhas (Pasaporte VE N° 100618958, Cédula V-6.319.717, Partida de Nacimiento y Planilla SAIME Atenas).',
+      files: [{ relPath: 'DOC SOFI HASSIN.pdf', destName: 'escaneo_doc_sofi_hassin.pdf', label: 'Expediente VE' }],
+    },
+    {
+      id: 'escaneo_sofi_tarjeta_cal_shufersal',
+      memberId: 'member_sofi',
+      category: 'Finanzas y Bancos',
+      subcategory: 'Tarjeta de Crédito',
+      title: 'Tarjeta Visa Cal Shufersal (1531) - Sofi',
+      notes: 'Tarjeta Visa Cal / Shufersal (Dorada) de Sofi Estel Pinchas Hasin · Cuenta/Ref: 540-000427197.',
+      recordType: 'card',
+      cardNumber: '4580 1700 0338 1531',
+      cardHolder: 'SOFI ASTEL PINCHAS HASIN',
+      cardExp: '11/31',
+      cardCvc: '760',
+      cardBank: 'Cal Shufersal',
+      cardBrand: 'Visa',
+      cardTheme: 'gold',
+      cardAccountNo: '540-000427197',
+      files: [
+        { relPath: '8a58251a-e62c-4f26-8db0-06720a6c12eb.pdf', destName: 'escaneo_sofi_cal_1531_frente.pdf', label: 'Frente' },
+        { relPath: '34c85392-cd0c-435e-813b-576de70a6431.pdf', destName: 'escaneo_sofi_cal_1531_dorso.pdf', label: 'Dorso (CVV)' },
+      ],
+    },
+    {
+      id: 'escaneo_sofi_tarjeta_max',
+      memberId: 'member_sofi',
+      category: 'Finanzas y Bancos',
+      subcategory: 'Tarjeta de Crédito',
+      title: 'Tarjeta Visa MAX (9329) - Sofi',
+      notes: 'Tarjeta de crédito Visa MAX (Biyajad Beshvilja) de Sofi Estel Hassin.',
+      recordType: 'card',
+      cardNumber: '4580 5611 9469 9329',
+      cardHolder: 'SOFI ESTEL HASSIN',
+      cardExp: '08/27',
+      cardCvc: '899',
+      cardBank: 'MAX',
+      cardBrand: 'Visa',
+      cardTheme: 'ocean_blue',
+      files: [
+        { relPath: '69dbe3b7-7cb9-4048-a03b-157d9219e5be.pdf', destName: 'escaneo_sofi_max_9329_frente.pdf', label: 'Frente' },
+        { relPath: 'c1c2a8aa-6a8b-45b1-973f-e974f6dade46.pdf', destName: 'escaneo_sofi_max_9329_dorso.pdf', label: 'Dorso (CVV)' },
+      ],
+    },
+    {
+      id: 'escaneo_sofi_tarjeta_cal_7688',
+      memberId: 'member_sofi',
+      category: 'Finanzas y Bancos',
+      subcategory: 'Tarjeta de Crédito',
+      title: 'Tarjeta Visa Cal (7688) - Sofi',
+      notes: 'Tarjeta Visa Cal de Sofi · Cuenta/Ref: 540-000427197.',
+      recordType: 'card',
+      cardNumber: '4580 2802 0059 7688',
+      cardHolder: 'SOFI ESTEL HASSIN',
+      cardExp: '07/30',
+      cardCvc: '172',
+      cardBank: 'Cal',
+      cardBrand: 'Visa',
+      cardTheme: 'silver',
+      cardAccountNo: '540-000427197',
+      files: [
+        { relPath: 'ae74d76e-5d7d-4128-9d2b-0db2dbaf61d2.pdf', destName: 'escaneo_sofi_cal_7688_dorso.pdf', label: 'Dorso (Datos y CVV)' },
+      ],
+    },
+
+    // ================= SHARON =================
+    {
+      id: 'escaneo_sharon_cedula_ve',
+      memberId: 'member_sharon',
+      category: 'Documentos de Identidad',
+      subcategory: 'Cédula',
+      title: 'Cédula de Identidad (Venezuela) - Sharon',
+      notes: 'Cédula de Identidad venezolana escaneada de Sharon.',
+      files: [{ relPath: 'SHARON DOC/CEDULA SHARON VE.pdf', destName: 'escaneo_cedula_sharon_ve.pdf', label: 'Cédula VE' }],
+    },
+    {
+      id: 'escaneo_sharon_pasaporte_es',
+      memberId: 'member_sharon',
+      category: 'Documentos de Identidad',
+      subcategory: 'Pasaporte',
+      title: 'Pasaporte (España) - Sharon',
+      notes: 'Pasaporte español escaneado de Sharon.',
+      files: [{ relPath: 'SHARON DOC/PASAPORTE SHARON ES.pdf', destName: 'escaneo_pasaporte_sharon_es.pdf', label: 'Pasaporte ES' }],
+    },
+    {
+      id: 'escaneo_sharon_pasaporte_il',
+      memberId: 'member_sharon',
+      category: 'Documentos de Identidad',
+      subcategory: 'Pasaporte',
+      title: 'Pasaporte (Israel) - Sharon',
+      notes: 'Pasaporte israelí (Darkon) escaneado de Sharon.',
+      files: [{ relPath: 'SHARON DOC/PASAPORTE SHARON IL.pdf', destName: 'escaneo_pasaporte_sharon_il.pdf', label: 'Pasaporte IL' }],
+    },
+    {
+      id: 'escaneo_sharon_pasaporte_ve',
+      memberId: 'member_sharon',
+      category: 'Documentos de Identidad',
+      subcategory: 'Pasaporte',
+      title: 'Pasaporte (Venezuela) - Sharon',
+      notes: 'Pasaporte venezolano escaneado de Sharon.',
+      files: [{ relPath: 'SHARON DOC/PASAPORTE SHARON VE.pdf', destName: 'escaneo_pasaporte_sharon_ve.pdf', label: 'Pasaporte VE' }],
+    },
+
+    // ================= SHIRLY =================
+    {
+      id: 'escaneo_shirly_partida_nac',
+      memberId: 'member_shirly',
+      category: 'Documentos de Identidad',
+      subcategory: 'Partida de Nacimiento',
+      title: 'Partida de Nacimiento (Venezuela) - Shirly',
+      notes: 'Partida de Nacimiento venezolana escaneada de Shirly.',
+      files: [{ relPath: 'SHIRLY DOC/PARTIDA NAC SHIRLY VE.pdf', destName: 'escaneo_partida_nac_shirly_ve.pdf', label: 'Partida Nacimiento' }],
+    },
+    {
+      id: 'escaneo_shirly_pasaporte_es',
+      memberId: 'member_shirly',
+      category: 'Documentos de Identidad',
+      subcategory: 'Pasaporte',
+      title: 'Pasaporte (España) - Shirly',
+      notes: 'Pasaporte español escaneado de Shirly.',
+      files: [{ relPath: 'SHIRLY DOC/PASAPORTE SHIRLY ES.pdf', destName: 'escaneo_pasaporte_shirly_es.pdf', label: 'Pasaporte ES' }],
+    },
+    {
+      id: 'escaneo_shirly_pasaporte_il',
+      memberId: 'member_shirly',
+      category: 'Documentos de Identidad',
+      subcategory: 'Pasaporte',
+      title: 'Pasaporte (Israel) - Shirly',
+      notes: 'Pasaporte israelí (Darkon) escaneado de Shirly.',
+      files: [{ relPath: 'SHIRLY DOC/PASAPORTE SHIRLY IL.pdf', destName: 'escaneo_pasaporte_shirly_il.pdf', label: 'Pasaporte IL' }],
+    },
+    {
+      id: 'escaneo_shirly_pasaporte_ve',
+      memberId: 'member_shirly',
+      category: 'Documentos de Identidad',
+      subcategory: 'Pasaporte',
+      title: 'Pasaporte (Venezuela) - Shirly',
+      notes: 'Pasaporte venezolano escaneado de Shirly.',
+      files: [{ relPath: 'SHIRLY DOC/PASAPORTE SHIRLY VE.pdf', destName: 'escaneo_pasaporte_shirly_ve.pdf', label: 'Pasaporte VE' }],
+    },
+    {
+      id: 'escaneo_shirly_teudat_zeut',
+      memberId: 'member_shirly',
+      category: 'Documentos de Identidad',
+      subcategory: 'Visas / Residencia / Teudat Zehut',
+      title: 'Teudat Zehut (Israel) - Shirly',
+      notes: 'Documento de identidad israelí (Teudat Zehut completo, frente y anexo) de Shirly.',
+      files: [
+        { relPath: 'SHIRLY DOC/TEUDAT ZEUT SHIRLY.pdf', destName: 'escaneo_teudat_zeut_shirly.pdf', label: 'Completo' },
+        { relPath: 'SHIRLY DOC/TEUDAT ZEUT SHILY FRONT.pdf', destName: 'escaneo_teudat_zeut_shirly_front.pdf', label: 'Frente' },
+        { relPath: 'SHIRLY DOC/TEUDAT ZEUT SHILY 2.pdf', destName: 'escaneo_teudat_zeut_shirly_2.pdf', label: 'Anexo 2' },
+      ],
+    },
+
+    // ================= STEPHANIE =================
+    {
+      id: 'escaneo_stephanie_cedula_ve',
+      memberId: 'member_stephanie',
+      category: 'Documentos de Identidad',
+      subcategory: 'Cédula',
+      title: 'Cédula de Identidad (Venezuela) - Stephanie',
+      notes: 'Cédula de Identidad venezolana escaneada de Stephanie.',
+      files: [{ relPath: 'STEPHANIE DOC/CEDULA STEPANIE VE.pdf', destName: 'escaneo_cedula_stephanie_ve.pdf', label: 'Cédula VE' }],
+    },
+    {
+      id: 'escaneo_stephanie_pasaporte_es',
+      memberId: 'member_stephanie',
+      category: 'Documentos de Identidad',
+      subcategory: 'Pasaporte',
+      title: 'Pasaporte (España) - Stephanie',
+      notes: 'Pasaporte español escaneado de Stephanie.',
+      files: [{ relPath: 'STEPHANIE DOC/PASAPORTE STEPHANIE ES.pdf', destName: 'escaneo_pasaporte_stephanie_es.pdf', label: 'Pasaporte ES' }],
+    },
+    {
+      id: 'escaneo_stephanie_pasaporte_il',
+      memberId: 'member_stephanie',
+      category: 'Documentos de Identidad',
+      subcategory: 'Pasaporte',
+      title: 'Pasaporte (Israel) - Stephanie',
+      notes: 'Pasaporte israelí (Darkon) escaneado de Stephanie.',
+      files: [{ relPath: 'STEPHANIE DOC/PASAPORTE STEPHANIE IL.pdf', destName: 'escaneo_pasaporte_stephanie_il.pdf', label: 'Pasaporte IL' }],
+    },
+    {
+      id: 'escaneo_stephanie_pasaporte_ve',
+      memberId: 'member_stephanie',
+      category: 'Documentos de Identidad',
+      subcategory: 'Pasaporte',
+      title: 'Pasaporte (Venezuela) - Stephanie',
+      notes: 'Pasaporte venezolano escaneado de Stephanie.',
+      files: [{ relPath: 'STEPHANIE DOC/PASAPORTE STEPHANIE VE.pdf', destName: 'escaneo_pasaporte_stephanie_ve.pdf', label: 'Pasaporte VE' }],
+    },
+    {
+      id: 'escaneo_stephanie_banco_leumi',
+      memberId: 'member_stephanie',
+      category: 'Finanzas y Bancos',
+      subcategory: 'Cuentas Bancarias',
+      title: 'Certificado de Titularidad Cuenta Banco Leumi - Stephanie',
+      notes: 'Certificado oficial de titularidad de cuenta bancaria en Banco Leumi de Stephanie Hassine.',
+      files: [
+        {
+          relPath: 'STEPHANIE DOC/Certificado_Titularidad_Cuenta_Banco_Leumi_Stephanie_Hassine.pdf',
+          destName: 'escaneo_certificado_banco_leumi_stephanie.pdf',
+          label: 'Certificado Banco Leumi',
+        },
+      ],
+    },
+    {
+      id: 'escaneo_stephanie_bagrut',
+      memberId: 'member_stephanie',
+      category: 'Educación y Títulos',
+      subcategory: 'Títulos y Diplomas',
+      title: 'Teudat Bagrut (Certificado de Bachillerato) - Stephanie',
+      notes: 'Certificado académico Teudat Bagrut de Stephanie.',
+      files: [{ relPath: 'STEPHANIE DOC/T BAGRUT STEPHANIE.pdf', destName: 'escaneo_bagrut_stephanie.pdf', label: 'Teudat Bagrut' }],
+    },
+
+    // ================= MERCEDES =================
+    {
+      id: 'escaneo_mercedes_cedula',
+      memberId: 'member_mercedes',
+      category: 'Documentos de Identidad',
+      subcategory: 'Cédula',
+      title: 'Cédula de Identidad - Mercedes',
+      notes: 'Cédula de Identidad escaneada de Mercedes.',
+      files: [{ relPath: 'CEDULA MERCEDES.pdf', destName: 'escaneo_cedula_mercedes.pdf', label: 'Cédula' }],
+    },
+
+    // ================= MOISES =================
+    {
+      id: 'escaneo_moises_expediente_ve',
+      memberId: 'member_moises',
+      category: 'Documentos de Identidad',
+      subcategory: 'Pasaporte',
+      title: 'Expediente Documentos Venezuela (Pasaporte, Cédula, Gaceta y Cita) - Moisés',
+      notes: 'Compilación de documentos de Moisés Hadida Serruya (Pasaporte VE N° 091849665, Cédula V-9.732.326 / E-1.063.398, Gaceta Oficial N° 2.289 y Planilla SAIME Atenas).',
+      files: [{ relPath: 'DOC MOISES HADIDA ATN.pdf', destName: 'escaneo_doc_moises_hadida.pdf', label: 'Expediente VE' }],
+    },
+  ];
+
+  const nowIso = new Date().toISOString();
+  const upsertStmt = db.prepare(`
+    INSERT OR REPLACE INTO personal_records (
+      id, member_id, category, subcategory, title, notes, record_type,
+      file_name, file_type, file_size, file_url, file_data_url,
+      attachments_json, todos_json,
+      card_number, card_holder, card_exp, card_cvc, card_atm_pin,
+      card_bank, card_brand, card_theme, card_account_no,
+      created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, '[]', ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?)
+  `);
+
+  const seedTx = db.transaction(() => {
+    for (const doc of docsToSeed) {
+      const attachments = doc.files
+        .map((f) => copyEscaneoFile(f.relPath, f.destName, f.label))
+        .filter((a): a is NonNullable<typeof a> => a !== null);
+
+      if (attachments.length === 0) continue;
+
+      const primary = attachments[0];
+      upsertStmt.run(
+        doc.id,
+        doc.memberId,
+        doc.category,
+        doc.subcategory,
+        doc.title,
+        doc.notes,
+        doc.recordType || 'document',
+        primary.fileName,
+        primary.fileType,
+        primary.fileSize,
+        primary.fileUrl,
+        JSON.stringify(attachments),
+        doc.cardNumber || '',
+        doc.cardHolder || '',
+        doc.cardExp || '',
+        doc.cardCvc || '',
+        doc.cardBank || '',
+        doc.cardBrand || '',
+        doc.cardTheme || 'black_vip',
+        doc.cardAccountNo || '',
+        nowIso,
+        nowIso
+      );
+    }
+  });
+
+  seedTx();
 }
 
 function hashPin(pin: string): string {

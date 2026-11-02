@@ -8,8 +8,7 @@ import {
   Send,
   ChevronLeft,
   ChevronRight,
-  File,
-  Image as ImageIcon,
+  ExternalLink,
 } from 'lucide-react';
 import { PersonalRecord, RecordAttachment } from '../types';
 
@@ -70,14 +69,18 @@ export const PhotoLightboxModal: React.FC<PhotoLightboxModalProps> = ({
   if (!record || attachments.length === 0) return null;
 
   const currentAttachment = attachments[currentIndex] || attachments[0];
+  const targetUrl = currentAttachment.fileUrl || currentAttachment.fileDataUrl || '';
   const isImage =
     currentAttachment.fileType?.startsWith('image/') ||
     (currentAttachment.fileDataUrl && currentAttachment.fileDataUrl.startsWith('data:image/'));
+  const isPdf =
+    currentAttachment.fileType === 'application/pdf' ||
+    currentAttachment.fileName?.toLowerCase().endsWith('.pdf') ||
+    targetUrl.toLowerCase().endsWith('.pdf');
 
-  const titleText = record.subcategory || record.category || 'Documento';
+  const titleText = record.title || record.subcategory || record.category || 'Documento';
 
   const handleDownload = () => {
-    const targetUrl = currentAttachment.fileUrl || currentAttachment.fileDataUrl;
     if (targetUrl) {
       const link = document.createElement('a');
       link.href = targetUrl;
@@ -111,8 +114,8 @@ export const PhotoLightboxModal: React.FC<PhotoLightboxModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Control Bar */}
-        <div className="w-full flex items-center justify-between text-white pb-3 px-2 shrink-0">
-          <div className="min-w-0 pr-4 flex items-center gap-2 flex-wrap">
+        <div className="w-full flex items-center justify-between text-white pb-3 px-2 shrink-0 gap-2">
+          <div className="min-w-0 pr-2 flex items-center gap-2 flex-wrap">
             <span className="px-2.5 py-1 rounded-xl text-xs font-bold bg-red-600 text-white border border-red-500 flex items-center gap-1">
               <Folder className="w-3 h-3" />
               <span>{record.category}</span>
@@ -120,7 +123,7 @@ export const PhotoLightboxModal: React.FC<PhotoLightboxModalProps> = ({
 
             <span className="text-sm sm:text-base font-black text-white flex items-center gap-1">
               <Tag className="w-3.5 h-3.5 text-red-400" />
-              <span>{record.subcategory}</span>
+              <span>{titleText}</span>
             </span>
 
             {currentAttachment.label && (
@@ -134,15 +137,22 @@ export const PhotoLightboxModal: React.FC<PhotoLightboxModalProps> = ({
                 {currentIndex + 1} de {attachments.length}
               </span>
             )}
-
-            {currentAttachment.fileName && (
-              <span className="text-xs text-slate-300 truncate max-w-[200px] sm:max-w-xs">
-                ({currentAttachment.fileName})
-              </span>
-            )}
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {targetUrl && (
+              <a
+                href={targetUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-1.5 rounded-xl bg-slate-800 text-white hover:bg-slate-700 border border-slate-700 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                title="Abrir en nueva pestaña"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Abrir</span>
+              </a>
+            )}
+
             {onSendRecord && (
               <button
                 onClick={() => {
@@ -153,7 +163,7 @@ export const PhotoLightboxModal: React.FC<PhotoLightboxModalProps> = ({
                 title="Enviar o compartir dato"
               >
                 <Send className="w-3.5 h-3.5 text-red-500" />
-                <span>Enviar</span>
+                <span className="hidden sm:inline">Enviar</span>
               </button>
             )}
 
@@ -163,7 +173,7 @@ export const PhotoLightboxModal: React.FC<PhotoLightboxModalProps> = ({
               title="Descargar archivo activo"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Descargar</span>
+              <span className="hidden sm:inline">Descargar</span>
             </button>
 
             <button
@@ -176,8 +186,7 @@ export const PhotoLightboxModal: React.FC<PhotoLightboxModalProps> = ({
         </div>
 
         {/* Content View Area with Navigation Arrows */}
-        <div className="relative w-full flex-1 flex items-center justify-center min-h-[50vh] max-h-[70vh] overflow-hidden rounded-3xl bg-slate-950/80 border border-slate-800 p-2 sm:p-4">
-          {/* Previous Arrow */}
+        <div className="relative w-full flex-1 flex items-center justify-center min-h-[55vh] max-h-[75vh] overflow-hidden rounded-3xl bg-slate-950/80 border border-slate-800 p-2 sm:p-4">
           {attachments.length > 1 && (
             <button
               onClick={handlePrev}
@@ -188,14 +197,20 @@ export const PhotoLightboxModal: React.FC<PhotoLightboxModalProps> = ({
             </button>
           )}
 
-          {/* Main Visualizer */}
           {isImage ? (
             <img
               key={currentAttachment.id || currentIndex}
-              src={currentAttachment.fileDataUrl || currentAttachment.fileUrl}
+              src={targetUrl}
               alt={currentAttachment.fileName || titleText}
-              className="max-h-[66vh] max-w-full object-contain rounded-2xl shadow-2xl transition-all animate-in fade-in duration-200"
+              className="max-h-[70vh] max-w-full object-contain rounded-2xl shadow-2xl transition-all animate-in fade-in duration-200"
               referrerPolicy="no-referrer"
+            />
+          ) : isPdf && targetUrl ? (
+            <iframe
+              key={currentAttachment.id || currentIndex}
+              src={targetUrl}
+              title={currentAttachment.fileName || titleText}
+              className="w-full h-[68vh] rounded-2xl bg-white border border-slate-700 shadow-2xl"
             />
           ) : (
             <div className="py-16 px-8 flex flex-col items-center gap-4 text-center text-slate-200 animate-in fade-in duration-200">
@@ -220,7 +235,6 @@ export const PhotoLightboxModal: React.FC<PhotoLightboxModalProps> = ({
             </div>
           )}
 
-          {/* Next Arrow */}
           {attachments.length > 1 && (
             <button
               onClick={handleNext}
@@ -252,9 +266,9 @@ export const PhotoLightboxModal: React.FC<PhotoLightboxModalProps> = ({
                   }`}
                   title={att.fileName || `Documento ${idx + 1}`}
                 >
-                  {isThumbImg && att.fileDataUrl ? (
+                  {isThumbImg && (att.fileDataUrl || att.fileUrl) ? (
                     <img
-                      src={att.fileDataUrl}
+                      src={att.fileDataUrl || att.fileUrl}
                       alt="Thumbnail"
                       className="w-full h-full object-cover"
                     />
