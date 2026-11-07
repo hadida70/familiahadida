@@ -61,6 +61,7 @@ import {
   deletePassword,
   insertNotification,
   markNotificationsAsRead,
+  convertJpegBufferToPdfBuffer,
 } from './database.ts';
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -416,6 +417,45 @@ async function startServer() {
 
   // ================= FILE UPLOAD ROUTE (ADMIN ONLY) =================
 
+  const normalizeUploadedFileToPdf = (f: Express.Multer.File) => {
+    let filename = f.filename;
+    let originalname = f.originalname;
+    let mimetype = f.mimetype;
+    let size = f.size;
+
+    const fullPath = path.join(UPLOADS_DIR, filename);
+    if (
+      !filename.toLowerCase().endsWith('.pdf') &&
+      fs.existsSync(fullPath) &&
+      (mimetype.includes('jpeg') ||
+        mimetype.includes('jpg') ||
+        /\.(jpg|jpeg)$/i.test(filename))
+    ) {
+      try {
+        const rawBuf = fs.readFileSync(fullPath);
+        const pdfBuf = convertJpegBufferToPdfBuffer(rawBuf);
+        const pdfFilename = filename.replace(/\.(jpg|jpeg)$/i, '') + '.pdf';
+        const pdfFullPath = path.join(UPLOADS_DIR, pdfFilename);
+        fs.writeFileSync(pdfFullPath, pdfBuf);
+        filename = pdfFilename;
+        originalname = originalname.replace(/\.(jpg|jpeg)$/i, '') + '.pdf';
+        mimetype = 'application/pdf';
+        size = pdfBuf.length;
+      } catch (convErr) {
+        console.error('Error converting uploaded file to PDF:', convErr);
+      }
+    }
+
+    return {
+      id: 'att_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+      fileName: originalname,
+      fileUrl: `/uploads/${filename}`,
+      fileType: mimetype,
+      fileSize: size,
+      createdAt: new Date().toISOString(),
+    };
+  };
+
   // POST /api/upload - Upload single or multiple files to disk storage
   app.post('/api/upload', (req: Request, res, next) => {
     upload.fields([{ name: 'files', maxCount: 20 }, { name: 'file', maxCount: 1 }])(req, res, (err) => {
@@ -435,14 +475,7 @@ async function startServer() {
         return res.status(400).json({ error: 'No se subió ningún archivo.' });
       }
 
-      const uploadedFiles = filesList.map((f) => ({
-        id: 'att_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
-        fileName: f.originalname,
-        fileUrl: `/uploads/${f.filename}`,
-        fileType: f.mimetype,
-        fileSize: f.size,
-        createdAt: new Date().toISOString(),
-      }));
+      const uploadedFiles = filesList.map(normalizeUploadedFileToPdf);
 
       const primary = uploadedFiles[0];
 
@@ -465,14 +498,7 @@ async function startServer() {
       return res.status(400).json({ error: 'No se enviaron archivos para subir.' });
     }
 
-    const uploadedFiles = files.map((f) => ({
-      id: 'att_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
-      fileName: f.originalname,
-      fileUrl: `/uploads/${f.filename}`,
-      fileType: f.mimetype,
-      fileSize: f.size,
-      createdAt: new Date().toISOString(),
-    }));
+    const uploadedFiles = files.map(normalizeUploadedFileToPdf);
 
     res.json({
       success: true,

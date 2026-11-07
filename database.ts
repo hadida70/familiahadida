@@ -36,6 +36,130 @@ export const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
+export function convertJpegBufferToPdfBuffer(jpegBuf: Buffer): Buffer {
+  // If already a PDF, return as-is
+  if (
+    jpegBuf.length > 4 &&
+    jpegBuf[0] === 0x25 &&
+    jpegBuf[1] === 0x50 &&
+    jpegBuf[2] === 0x44 &&
+    jpegBuf[3] === 0x46
+  ) {
+    return jpegBuf;
+  }
+
+  let width = 800;
+  let height = 600;
+  let bits = 8;
+  let components = 3;
+
+  if (jpegBuf.length > 4 && jpegBuf[0] === 0xff && jpegBuf[1] === 0xd8) {
+    let pos = 2;
+    while (pos + 4 < jpegBuf.length) {
+      if (jpegBuf[pos] !== 0xff) {
+        pos++;
+        continue;
+      }
+      while (pos < jpegBuf.length && jpegBuf[pos] === 0xff) {
+        pos++;
+      }
+      if (pos >= jpegBuf.length) break;
+      const marker = jpegBuf[pos];
+      pos++;
+
+      if (
+        marker === 0xd8 ||
+        marker === 0xd9 ||
+        marker === 0x01 ||
+        (marker >= 0xd0 && marker <= 0xd7)
+      ) {
+        continue;
+      }
+      if (pos + 2 > jpegBuf.length) break;
+      const segLen = jpegBuf.readUInt16BE(pos);
+      if (segLen < 2 || pos + segLen > jpegBuf.length) break;
+
+      if (
+        marker === 0xc0 ||
+        marker === 0xc1 ||
+        marker === 0xc2 ||
+        marker === 0xc3 ||
+        marker === 0xc9 ||
+        marker === 0xca
+      ) {
+        if (pos + 7 < jpegBuf.length) {
+          bits = jpegBuf[pos + 2] || 8;
+          height = jpegBuf.readUInt16BE(pos + 3) || 600;
+          width = jpegBuf.readUInt16BE(pos + 5) || 800;
+          components = jpegBuf[pos + 7] || 3;
+          break;
+        }
+      }
+      pos += segLen;
+    }
+  }
+
+  const colorSpace =
+    components === 1 ? '/DeviceGray' : components === 4 ? '/DeviceCMYK' : '/DeviceRGB';
+
+  const maxPagePt = 792;
+  const scale = maxPagePt / Math.max(width, height, 1);
+  const pageW = Math.max(72, Number((width * scale).toFixed(2)));
+  const pageH = Math.max(72, Number((height * scale).toFixed(2)));
+
+  const chunks: Buffer[] = [];
+  let offset = 0;
+  const offsets: number[] = [0];
+
+  const pushStr = (str: string) => {
+    const b = Buffer.from(str, 'binary');
+    chunks.push(b);
+    offset += b.length;
+  };
+  const pushBuf = (b: Buffer) => {
+    chunks.push(b);
+    offset += b.length;
+  };
+
+  pushStr('%PDF-1.4\n%\xFF\xFF\xFF\xFF\n');
+
+  offsets[1] = offset;
+  pushStr('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
+
+  offsets[2] = offset;
+  pushStr('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n');
+
+  offsets[3] = offset;
+  pushStr(
+    `3 0 obj\n<< /Type /Page /Parent 2 0 R /Resources << /XObject << /Im0 4 0 R >> >> /MediaBox [0 0 ${pageW} ${pageH}] /Contents 5 0 R >>\nendobj\n`
+  );
+
+  offsets[4] = offset;
+  pushStr(
+    `4 0 obj\n<< /Type /XObject /Subtype /Image /Width ${width} /Height ${height} /ColorSpace ${colorSpace} /BitsPerComponent ${bits} /Filter /DCTDecode /Length ${jpegBuf.length} >>\nstream\n`
+  );
+  pushBuf(jpegBuf);
+  pushStr('\nendstream\nendobj\n');
+
+  const contentStream = `q\n${pageW} 0 0 ${pageH} 0 0 cm\n/Im0 Do\nQ\n`;
+  const contentBuf = Buffer.from(contentStream, 'binary');
+  offsets[5] = offset;
+  pushStr(`5 0 obj\n<< /Length ${contentBuf.length} >>\nstream\n`);
+  pushBuf(contentBuf);
+  pushStr('\nendstream\nendobj\n');
+
+  const xrefOffset = offset;
+  pushStr('xref\n0 6\n0000000000 65535 f \n');
+  for (let i = 1; i <= 5; i++) {
+    const offStr = String(offsets[i]).padStart(10, '0');
+    pushStr(`${offStr} 00000 n \n`);
+  }
+
+  pushStr(`trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`);
+
+  return Buffer.concat(chunks);
+}
+
 export function saveBase64ToDisk(dataUrl: string, recordId: string, index: number = 0): string | null {
   if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) return null;
   try {
@@ -43,16 +167,25 @@ export function saveBase64ToDisk(dataUrl: string, recordId: string, index: numbe
     if (!matches) return null;
     const mime = matches[1];
     const base64Data = matches[2];
-    let ext = '.jpg';
+    const rawBuf = Buffer.from(base64Data, 'base64');
+
+    const safeId = recordId.replace(/[^a-zA-Z0-9_-]/g, '_');
+    if (mime.includes('jpeg') || mime.includes('jpg') || (rawBuf[0] === 0xff && rawBuf[1] === 0xd8)) {
+      const fileName = `migrated_${safeId}_${Date.now()}_${index}.pdf`;
+      const filePath = path.join(UPLOADS_DIR, fileName);
+      fs.writeFileSync(filePath, convertJpegBufferToPdfBuffer(rawBuf));
+      return `/uploads/${fileName}`;
+    }
+
+    let ext = '.pdf';
     if (mime.includes('png')) ext = '.png';
     else if (mime.includes('pdf')) ext = '.pdf';
     else if (mime.includes('webp')) ext = '.webp';
     else if (mime.includes('gif')) ext = '.gif';
 
-    const safeId = recordId.replace(/[^a-zA-Z0-9_-]/g, '_');
     const fileName = `migrated_${safeId}_${Date.now()}_${index}${ext}`;
     const filePath = path.join(UPLOADS_DIR, fileName);
-    fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
+    fs.writeFileSync(filePath, rawBuf);
     return `/uploads/${fileName}`;
   } catch (err) {
     console.error('Error saving base64 to disk:', err);
@@ -350,6 +483,185 @@ export function initDatabase() {
     seedEscaneoProfesionalDocuments();
   } catch (err) {
     console.error('Error seeding ESCANEO PROFESIONAL documents:', err);
+  }
+
+  // Auto-migration: Move Jaime's 'Finanzas y Bancos' records to 'Tarjetas de Crédito'
+  try {
+    migrateJaimeFinanzasToTarjetasDeCredito();
+  } catch (err) {
+    console.error('Error migrating Jaime Finanzas y Bancos to Tarjetas de Crédito:', err);
+  }
+
+  // Auto-migration: Convert all non-PDF attachments of all users to PDF
+  try {
+    migrateAllRecordsToPdf();
+  } catch (err) {
+    console.error('Error migrating all attachments to PDF:', err);
+  }
+}
+
+function migrateJaimeFinanzasToTarjetasDeCredito() {
+  const nowIso = new Date().toISOString();
+
+  // Ensure 'Tarjetas de Crédito' category exists in data_categories
+  const existingTarjetas = db
+    .prepare(
+      "SELECT id FROM data_categories WHERE id = 'cat_tarjetas_credito' OR LOWER(name) = LOWER('Tarjetas de Crédito')"
+    )
+    .get() as { id: string } | undefined;
+
+  if (!existingTarjetas) {
+    db.prepare(`
+      INSERT INTO data_categories (id, name, icon, color, description, subcategories_json, is_default, created_at)
+      VALUES ('cat_tarjetas_credito', 'Tarjetas de Crédito', 'credit-card', '#059669', 'Tarjetas de crédito y débito', ?, 1, ?)
+    `).run(JSON.stringify(['Tarjeta de Crédito', 'Tarjeta de Débito']), nowIso);
+  }
+
+  // Move everything in 'Finanzas y Bancos' (or 'Finanzas y Banco') of user Jaime to 'Tarjetas de Crédito'
+  db.prepare(`
+    UPDATE personal_records
+    SET category = 'Tarjetas de Crédito', updated_at = ?
+    WHERE member_id = 'member_jaime'
+      AND (LOWER(category) LIKE '%finanzas y banco%' OR LOWER(category) = 'finanzas y bancos')
+  `).run(nowIso);
+
+  // If cat_finanzas is still named 'Finanzas y Bancos' and no records use 'Finanzas y Bancos', align its name to 'BANCO'
+  const remainingFinanzas = db
+    .prepare("SELECT COUNT(*) as c FROM personal_records WHERE LOWER(category) LIKE '%finanzas y banco%'")
+    .get() as { c: number };
+  if (remainingFinanzas.c === 0) {
+    db.prepare(`
+      UPDATE data_categories
+      SET name = 'BANCO'
+      WHERE id = 'cat_finanzas' AND LOWER(name) LIKE '%finanzas y banco%'
+    `).run();
+  }
+}
+
+function migrateAllRecordsToPdf() {
+  const allRecords = db
+    .prepare('SELECT id, file_name, file_type, file_size, file_url, attachments_json FROM personal_records')
+    .all() as Array<{
+    id: string;
+    file_name: string;
+    file_type: string;
+    file_size: number;
+    file_url: string;
+    attachments_json: string;
+  }>;
+
+  const updateStmt = db.prepare(`
+    UPDATE personal_records
+    SET file_name = ?, file_type = ?, file_size = ?, file_url = ?, file_data_url = '', attachments_json = ?
+    WHERE id = ?
+  `);
+
+  const toPdfDisplayName = (name: string, fallback: string): string => {
+    const raw = (name || fallback || 'documento').trim();
+    const withoutExt = raw.replace(/\.(jpg|jpeg|png|webp|gif|pdf)$/i, '');
+    return `${withoutExt || 'documento'}.pdf`;
+  };
+
+  for (const r of allRecords) {
+    let changed = false;
+    let attachments: any[] = [];
+    if (r.attachments_json) {
+      try {
+        attachments = JSON.parse(r.attachments_json);
+      } catch {
+        attachments = [];
+      }
+    }
+
+    if ((!Array.isArray(attachments) || attachments.length === 0) && r.file_url) {
+      attachments = [
+        {
+          id: 'att_' + r.id,
+          fileName: r.file_name || path.basename(r.file_url),
+          fileType: r.file_type || '',
+          fileSize: r.file_size || 0,
+          fileUrl: r.file_url,
+          fileDataUrl: '',
+        },
+      ];
+      changed = true;
+    }
+
+    if (Array.isArray(attachments) && attachments.length > 0) {
+      attachments = attachments.map((att) => {
+        if (!att || !att.fileUrl) return att;
+
+        const diskFileName = path.basename(att.fileUrl);
+        const isDiskPdf = diskFileName.toLowerCase().endsWith('.pdf');
+        const pdfDiskFileName = isDiskPdf
+          ? diskFileName
+          : diskFileName.replace(/\.(jpg|jpeg|png|webp|gif)$/i, '') + '.pdf';
+
+        const srcPath = path.join(UPLOADS_DIR, diskFileName);
+        const pdfPath = path.join(UPLOADS_DIR, pdfDiskFileName);
+
+        if (!isDiskPdf || !fs.existsSync(pdfPath)) {
+          if (fs.existsSync(srcPath)) {
+            try {
+              const srcBuf = fs.readFileSync(srcPath);
+              const pdfBuf = convertJpegBufferToPdfBuffer(srcBuf);
+              fs.writeFileSync(pdfPath, pdfBuf);
+              changed = true;
+            } catch (convErr) {
+              console.error(`Error converting ${srcPath} to PDF:`, convErr);
+            }
+          }
+        }
+
+        const nextFileName = toPdfDisplayName(att.fileName, pdfDiskFileName);
+        const nextFileUrl = `/uploads/${pdfDiskFileName}`;
+        const nextFileType = 'application/pdf';
+        const nextFileSize = fs.existsSync(pdfPath)
+          ? fs.statSync(pdfPath).size
+          : att.fileSize || 0;
+
+        if (
+          att.fileName !== nextFileName ||
+          att.fileUrl !== nextFileUrl ||
+          att.fileType !== nextFileType ||
+          att.fileSize !== nextFileSize ||
+          att.fileDataUrl
+        ) {
+          changed = true;
+        }
+
+        return {
+          ...att,
+          fileName: nextFileName,
+          fileType: nextFileType,
+          fileSize: nextFileSize,
+          fileUrl: nextFileUrl,
+          fileDataUrl: '',
+        };
+      });
+
+      const primary = attachments[0];
+      if (
+        primary &&
+        (r.file_name !== primary.fileName ||
+          r.file_type !== primary.fileType ||
+          r.file_url !== primary.fileUrl ||
+          r.file_size !== primary.fileSize)
+      ) {
+        changed = true;
+      }
+
+      if (changed && primary) {
+        updateStmt.run(
+          primary.fileName,
+          primary.fileType,
+          primary.fileSize,
+          primary.fileUrl,
+          JSON.stringify(attachments),
+          r.id
+        );
+      }
+    }
   }
 }
 
