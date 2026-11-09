@@ -679,9 +679,6 @@ function seedEscaneoProfesionalDocuments() {
   const catVehiculos = getCategoryName('cat_vehiculos', 'VEHICULOS');
   const catEducacion = getCategoryName('cat_educacion', 'Educación y Títulos');
 
-  // Remove previous individual escaneo_* records to avoid duplicates before upserting clean grouped records
-  db.prepare("DELETE FROM personal_records WHERE id LIKE 'escaneo_%'").run();
-
   const copyEscaneoFile = (relPath: string, destFileName: string, label?: string) => {
     const srcPath = path.join(escaneoDir, relPath);
     if (!fs.existsSync(srcPath)) return null;
@@ -1075,7 +1072,7 @@ function seedEscaneoProfesionalDocuments() {
 
   const nowIso = new Date().toISOString();
   const upsertStmt = db.prepare(`
-    INSERT OR REPLACE INTO personal_records (
+    INSERT OR IGNORE INTO personal_records (
       id, member_id, category, subcategory, title, notes, record_type,
       file_name, file_type, file_size, file_url, file_data_url,
       attachments_json, todos_json,

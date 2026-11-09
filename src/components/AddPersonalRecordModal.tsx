@@ -51,7 +51,10 @@ export const isBankCategory = (cat: string) => {
     str.includes('bancos') ||
     str.includes('finanza') ||
     str.includes('finanzas') ||
-    str.includes('bank')
+    str.includes('bank') ||
+    str.includes('tarjeta') ||
+    str.includes('credito') ||
+    str.includes('crédito')
   );
 };
 
@@ -93,6 +96,7 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
   const [memberId, setMemberId] = useState<string>(activeMember?.id || members[0]?.id || 'member_jaime');
   const [category, setCategory] = useState<string>('');
   const [subcategory, setSubcategory] = useState<string>('');
+  const [title, setTitle] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [isCustomCategory, setIsCustomCategory] = useState(false);
   const [isCustomSubcategory, setIsCustomSubcategory] = useState(false);
@@ -143,6 +147,7 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
       setMemberId(editingRecord.memberId);
       setCategory(editingRecord.category || '');
       setSubcategory(editingRecord.subcategory || '');
+      setTitle(editingRecord.title || editingRecord.subcategory || '');
       setNotes(editingRecord.notes || '');
 
       // Determine initial mode
@@ -230,6 +235,7 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
 
       setCategory(targetCat);
       setSubcategory(targetSub);
+      setTitle(targetSub);
       setNotes('');
       setIsCustomCategory(false);
       setIsCustomSubcategory(false);
@@ -292,7 +298,12 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
   };
 
   const handleSubcategorySelect = (subName: string) => {
-    setSubcategory(subName);
+    setSubcategory((prevSub) => {
+      if (!editingRecord && (!title.trim() || title.trim() === prevSub.trim())) {
+        setTitle(subName);
+      }
+      return subName;
+    });
     // Keep isCardMode as whatever the user chose with the switch button
   };
 
@@ -526,12 +537,14 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
     const firstAtt = attachments[0];
     const isBank = isBankCategory(finalCategory);
     const savingCard = isBank && isCardMode;
+    const finalTitle = title.trim() || finalSubcategory;
 
     onSave({
       id: editingRecord?.id || undefined,
       memberId,
       category: finalCategory,
       subcategory: finalSubcategory,
+      title: finalTitle,
       recordType: recordMode,
       notes: notes.trim(),
       attachments: attachments,
@@ -785,6 +798,26 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
               </button>
             </div>
           )}
+
+          {/* Título del Dato (Editable Title) */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5 text-red-500" />
+                <span>Título del Dato: <span className="text-red-500">*</span></span>
+              </span>
+              <span className="text-[10px] text-slate-400 font-normal">
+                Nombre visible en la tarjeta
+              </span>
+            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder={subcategory || 'Ej: Pasaporte Español, Tarjeta Visa Cal, Teudat Zehut...'}
+              className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm font-bold text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-red-500/30 focus:border-red-500"
+            />
+          </div>
 
           {/* Notes / Information field (Available for all records, bank accounts, instructions) */}
           <div>
