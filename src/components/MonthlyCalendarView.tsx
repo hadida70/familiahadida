@@ -255,37 +255,19 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
     });
   }, [tasks, selectedDate, selectedMemberFilter]);
 
-  // Next 7 Upcoming Events for the right-hand fast-reading panel
+  // Next 7 Upcoming Events for the right-hand fast-reading panel (strictly today or future dates)
   const upcomingSevenEvents = useMemo(() => {
-    const memberFiltered = tasks.filter(
-      (t) => selectedMemberFilter === 'all' || t.assignedToId === selectedMemberFilter
-    );
-
-    // 1. Future or today uncompleted tasks (sorted ascending by date, then time)
-    const futureUncompleted = memberFiltered
-      .filter((t) => !t.completed && t.date >= todayString)
-      .sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''));
-
-    if (futureUncompleted.length >= 7) {
-      return futureUncompleted.slice(0, 7);
-    }
-
-    // 2. If fewer than 7, include recent uncompleted tasks so no active event is missed
-    const pastUncompleted = memberFiltered
-      .filter((t) => !t.completed && t.date < todayString)
-      .sort((a, b) => b.date.localeCompare(a.date));
-
-    const combined = [...futureUncompleted, ...pastUncompleted];
-    if (combined.length >= 7) {
-      return combined.slice(0, 7);
-    }
-
-    // 3. If still fewer than 7, fill with future completed tasks
-    const futureCompleted = memberFiltered
-      .filter((t) => t.completed && t.date >= todayString)
-      .sort((a, b) => a.date.localeCompare(b.date));
-
-    return [...combined, ...futureCompleted].slice(0, 7);
+    return tasks
+      .filter(
+        (t) =>
+          t.date >= todayString &&
+          (selectedMemberFilter === 'all' || t.assignedToId === selectedMemberFilter)
+      )
+      .sort((a, b) => {
+        if (a.completed !== b.completed) return a.completed ? 1 : -1;
+        return a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || '');
+      })
+      .slice(0, 7);
   }, [tasks, selectedMemberFilter, todayString]);
 
   // Direct Add Task inside Modal
