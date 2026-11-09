@@ -688,6 +688,11 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
             {allCategoryNames.map((catName) => {
               const isSelected = selectedCategory.toLowerCase() === catName.toLowerCase();
               const catObj = categories.find((c) => c.name.toLowerCase() === catName.toLowerCase());
+              const totalInCat = records.filter(
+                (r) => r.category?.toLowerCase() === catName.toLowerCase()
+              ).length;
+              if (totalInCat === 0 && !isSelected) return null;
+
               const countInCat = records.filter((r) => {
                 if (selectedMemberId !== 'all' && r.memberId !== selectedMemberId) return false;
                 return r.category?.toLowerCase() === catName.toLowerCase();

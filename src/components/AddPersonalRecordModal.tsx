@@ -299,7 +299,7 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
 
   const handleSubcategorySelect = (subName: string) => {
     setSubcategory((prevSub) => {
-      if (!editingRecord && (!title.trim() || title.trim() === prevSub.trim())) {
+      if (!title.trim() || title.trim().toLowerCase() === prevSub.trim().toLowerCase()) {
         setTitle(subName);
       }
       return subName;
@@ -659,6 +659,26 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
             </div>
           </div>
 
+          {/* Título del Dato (Editable Title at Top) */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5 text-red-500" />
+                <span>Título del Dato: <span className="text-red-500">*</span></span>
+              </span>
+              <span className="text-[10px] text-slate-400 font-normal">
+                Editable (nombre principal de la tarjeta)
+              </span>
+            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder={subcategory || 'Ej: Pasaporte Español, Tarjeta Visa Cal, Teudat Zehut...'}
+              className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm font-bold text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-red-500/30 focus:border-red-500"
+            />
+          </div>
+
           {/* Category Selector */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
@@ -719,7 +739,7 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                 <Tag className="w-3.5 h-3.5 text-red-500" />
-                <span>Subcategoría / Nombre del Dato: <span className="text-red-500">*</span></span>
+                <span>Subcategoría: <span className="text-red-500">*</span></span>
               </label>
 
               {selectedCategoryObj && !isCustomSubcategory && (
@@ -798,26 +818,6 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
               </button>
             </div>
           )}
-
-          {/* Título del Dato (Editable Title) */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5 text-red-500" />
-                <span>Título del Dato: <span className="text-red-500">*</span></span>
-              </span>
-              <span className="text-[10px] text-slate-400 font-normal">
-                Nombre visible en la tarjeta
-              </span>
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder={subcategory || 'Ej: Pasaporte Español, Tarjeta Visa Cal, Teudat Zehut...'}
-              className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm font-bold text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-red-500/30 focus:border-red-500"
-            />
-          </div>
 
           {/* Notes / Information field (Available for all records, bank accounts, instructions) */}
           <div>
@@ -1218,15 +1218,24 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
                               </div>
                             )}
 
-                            {/* File metadata */}
+                            {/* File metadata (with editable file name) */}
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-1.5">
                                 <span className="text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 shrink-0">
                                   #{idx + 1}
                                 </span>
-                                <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
-                                  {att.fileName || `Archivo ${idx + 1}`}
-                                </p>
+                                <input
+                                  type="text"
+                                  value={att.fileName || ''}
+                                  onChange={(e) => {
+                                    const nextName = e.target.value;
+                                    setAttachments((prev) =>
+                                      prev.map((a, i) => (i === idx ? { ...a, fileName: nextName } : a))
+                                    );
+                                  }}
+                                  placeholder={`Archivo ${idx + 1}`}
+                                  className="w-full px-2 py-0.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-red-500"
+                                />
                               </div>
                               <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
                                 {formatFileSize(att.fileSize)} {att.fileType ? `• ${att.fileType.split('/')[1] || att.fileType}` : ''}

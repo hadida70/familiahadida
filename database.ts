@@ -498,32 +498,30 @@ export function initDatabase() {
   } catch (err) {
     console.error('Error migrating all attachments to PDF:', err);
   }
+
+  // Auto-migration: Remove unused categories and subcategories that have 0 records loaded
+  try {
+    pruneUnusedCategoriesAndSubcategories();
+  } catch (err) {
+    console.error('Error pruning unused categories and subcategories:', err);
+  }
 }
 
 function migrateJaimeFinanzasToTarjetasDeCredito() {
   const nowIso = new Date().toISOString();
 
-  // Ensure 'Tarjetas de Crédito' category exists in data_categories
-  const existingTarjetas = db
-    .prepare(
-      "SELECT id FROM data_categories WHERE id = 'cat_tarjetas_credito' OR LOWER(name) = LOWER('Tarjetas de Crédito')"
-    )
-    .get() as { id: string } | undefined;
+  // Move any remaining 'Finanzas y Bancos' records of Jaime to 'BANCO' -> 'Tarjeta de Crédito'
+  const bankCat = db
+    .prepare("SELECT name FROM data_categories WHERE id = 'cat_finanzas'")
+    .get() as { name: string } | undefined;
+  const targetCatName = bankCat?.name || 'BANCO';
 
-  if (!existingTarjetas) {
-    db.prepare(`
-      INSERT INTO data_categories (id, name, icon, color, description, subcategories_json, is_default, created_at)
-      VALUES ('cat_tarjetas_credito', 'Tarjetas de Crédito', 'credit-card', '#059669', 'Tarjetas de crédito y débito', ?, 1, ?)
-    `).run(JSON.stringify(['Tarjeta de Crédito', 'Tarjeta de Débito']), nowIso);
-  }
-
-  // Move everything in 'Finanzas y Bancos' (or 'Finanzas y Banco') of user Jaime to 'Tarjetas de Crédito'
   db.prepare(`
     UPDATE personal_records
-    SET category = 'Tarjetas de Crédito', updated_at = ?
+    SET category = ?, subcategory = 'Tarjeta de Crédito', updated_at = ?
     WHERE member_id = 'member_jaime'
       AND (LOWER(category) LIKE '%finanzas y banco%' OR LOWER(category) = 'finanzas y bancos')
-  `).run(nowIso);
+  `).run(targetCatName, nowIso);
 
   // If cat_finanzas is still named 'Finanzas y Bancos' and no records use 'Finanzas y Bancos', align its name to 'BANCO'
   const remainingFinanzas = db
@@ -535,6 +533,70 @@ function migrateJaimeFinanzasToTarjetasDeCredito() {
       SET name = 'BANCO'
       WHERE id = 'cat_finanzas' AND LOWER(name) LIKE '%finanzas y banco%'
     `).run();
+  }
+}
+
+function pruneUnusedCategoriesAndSubcategories() {
+  const allRecords = db
+    .prepare('SELECT category, subcategory FROM personal_records')
+    .all() as Array<{ category: string; subcategory: string }>;
+
+  if (allRecords.length === 0) return;
+
+  const allCategories = db
+    .prepare('SELECT id, name, subcategories_json FROM data_categories')
+    .all() as Array<{ id: string; name: string; subcategories_json: string }>;
+
+  const deleteCatStmt = db.prepare('DELETE FROM data_categories WHERE id = ?');
+  const updateSubsStmt = db.prepare('UPDATE data_categories SET subcategories_json = ? WHERE id = ?');
+
+  for (const cat of allCategories) {
+    const catNameLower = (cat.name || '').trim().toLowerCase();
+    const matchingRecords = allRecords.filter(
+      (r) => (r.category || '').trim().toLowerCase() === catNameLower
+    );
+
+    if (matchingRecords.length === 0) {
+      // Delete category that has 0 records loaded
+      deleteCatStmt.run(cat.id);
+      continue;
+    }
+
+    let currentSubs: string[] = [];
+    if (cat.subcategories_json) {
+      try {
+        currentSubs = JSON.parse(cat.subcategories_json);
+      } catch {
+        currentSubs = [];
+      }
+    }
+
+    const usedSubsMap = new Map<string, string>();
+    for (const r of matchingRecords) {
+      const subTrimmed = (r.subcategory || '').trim();
+      if (subTrimmed) {
+        const key = subTrimmed.toLowerCase();
+        if (!usedSubsMap.has(key)) {
+          const existingCanonical = currentSubs.find((s) => s.trim().toLowerCase() === key);
+          usedSubsMap.set(key, existingCanonical ? existingCanonical.trim() : subTrimmed);
+        }
+      }
+    }
+
+    const activeSubs: string[] = [];
+    for (const s of currentSubs) {
+      const key = s.trim().toLowerCase();
+      if (usedSubsMap.has(key) && !activeSubs.some((a) => a.toLowerCase() === key)) {
+        activeSubs.push(usedSubsMap.get(key)!);
+      }
+    }
+    for (const [key, val] of usedSubsMap.entries()) {
+      if (!activeSubs.some((a) => a.toLowerCase() === key)) {
+        activeSubs.push(val);
+      }
+    }
+
+    updateSubsStmt.run(JSON.stringify(activeSubs), cat.id);
   }
 }
 
