@@ -974,9 +974,11 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
 
           {/* ================= RELOJ MUNDIAL EXCLUSIVO DEL USUARIO JAIME ================= */}
           {(selectedMemberId === 'member_jaime' ||
-            members.find((m) => m.id === selectedMemberId)?.name?.toUpperCase() === 'JAIME') && (
-            <JaimeWorldClock />
-          )}
+            members.find((m) => m.id === selectedMemberId)?.name?.toUpperCase() === 'JAIME' ||
+            (selectedMemberId === 'all' &&
+              (activeMember?.id === 'member_jaime' ||
+                activeMember?.name?.toUpperCase() === 'JAIME' ||
+                isAdmin))) && <JaimeWorldClock />}
 
           {/* ================= SECCIÓN 1: CALENDARIO MENSUAL Y TAREAS ================= */}
           {onToggleTaskComplete && onDeleteTask && (
