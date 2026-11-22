@@ -37,6 +37,7 @@ interface AddPersonalRecordModalProps {
   editingRecord?: PersonalRecord | null;
   records?: PersonalRecord[];
   categories?: DataCategory[];
+  initialMemberId?: string;
   initialCategory?: string;
   initialSubcategory?: string;
   onOpenManageCategories?: () => void;
@@ -87,16 +88,20 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
   editingRecord,
   records = [],
   categories = [],
+  initialMemberId,
   initialCategory,
   initialSubcategory,
   onOpenManageCategories,
   onAddSubcategory,
   onPreviewAttachment,
 }) => {
-  const [memberId, setMemberId] = useState<string>(activeMember?.id || members[0]?.id || 'member_jaime');
+  const [memberId, setMemberId] = useState<string>(initialMemberId || activeMember?.id || members[0]?.id || 'member_jaime');
   const [category, setCategory] = useState<string>('');
   const [subcategory, setSubcategory] = useState<string>('');
   const [title, setTitle] = useState<string>('');
+  const [docNumber, setDocNumber] = useState<string>('');
+  const [docExpiry, setDocExpiry] = useState<string>('');
+  const [docCountry, setDocCountry] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [isCustomCategory, setIsCustomCategory] = useState(false);
   const [isCustomSubcategory, setIsCustomSubcategory] = useState(false);
@@ -148,7 +153,19 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
       setCategory(editingRecord.category || '');
       setSubcategory(editingRecord.subcategory || '');
       setTitle(editingRecord.title || editingRecord.subcategory || '');
-      setNotes(editingRecord.notes || '');
+      const rawNotes = editingRecord.notes || '';
+      const numMatch = rawNotes.match(/(?:^|\n)🔢 N° Documento:\s*(.+)/);
+      const expMatch = rawNotes.match(/(?:^|\n)📅 Vencimiento:\s*(.+)/);
+      const countryMatch = rawNotes.match(/(?:^|\n)🌍 País \/ Entidad:\s*(.+)/);
+      setDocNumber(numMatch ? numMatch[1].trim() : '');
+      setDocExpiry(expMatch ? expMatch[1].trim() : '');
+      setDocCountry(countryMatch ? countryMatch[1].trim() : '');
+      const cleanedNotes = rawNotes
+        .replace(/(?:^|\n)🔢 N° Documento:\s*.+/g, '')
+        .replace(/(?:^|\n)📅 Vencimiento:\s*.+/g, '')
+        .replace(/(?:^|\n)🌍 País \/ Entidad:\s*.+/g, '')
+        .trim();
+      setNotes(cleanedNotes);
 
       // Determine initial mode
       if (editingRecord.recordType === 'list') {
@@ -208,7 +225,11 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
       );
       setIsCardMode(hasExistingCard);
     } else {
-      const activeId = activeMember?.id || members[0]?.id || 'member_jaime';
+      const activeId =
+        (initialMemberId && initialMemberId !== 'all' ? initialMemberId : undefined) ||
+        activeMember?.id ||
+        members[0]?.id ||
+        'member_jaime';
       setMemberId(activeId);
 
       // Determine initial category and subcategory
@@ -236,6 +257,9 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
       setCategory(targetCat);
       setSubcategory(targetSub);
       setTitle(targetSub);
+      setDocNumber('');
+      setDocExpiry('');
+      setDocCountry('');
       setNotes('');
       setIsCustomCategory(false);
       setIsCustomSubcategory(false);
@@ -262,7 +286,7 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
     setShowNewSubInput(false);
     setNewSubInline('');
     setNewTodoText('');
-  }, [editingRecord, isOpen, activeMember, members, categories, initialCategory, initialSubcategory]);
+  }, [editingRecord, isOpen, activeMember, members, categories, initialMemberId, initialCategory, initialSubcategory]);
 
   if (!isOpen) return null;
 
@@ -539,6 +563,13 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
     const savingCard = isBank && isCardMode;
     const finalTitle = title.trim() || finalSubcategory;
 
+    const structuredLines: string[] = [];
+    if (docNumber.trim()) structuredLines.push(`🔢 N° Documento: ${docNumber.trim()}`);
+    if (docExpiry.trim()) structuredLines.push(`📅 Vencimiento: ${docExpiry.trim()}`);
+    if (docCountry.trim()) structuredLines.push(`🌍 País / Entidad: ${docCountry.trim()}`);
+    if (notes.trim()) structuredLines.push(notes.trim());
+    const finalNotes = structuredLines.join('\n');
+
     onSave({
       id: editingRecord?.id || undefined,
       memberId,
@@ -546,7 +577,7 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
       subcategory: finalSubcategory,
       title: finalTitle,
       recordType: recordMode,
-      notes: notes.trim(),
+      notes: finalNotes,
       attachments: attachments,
       todos: todos,
       // Backward-compatible single file fields
@@ -816,6 +847,64 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
               >
                 <X className="w-4 h-4" />
               </button>
+            </div>
+          )}
+
+          {/* Structured Document Fields (Teudat Zeut, Licencia, Pasaporte, Cédula, etc.) */}
+          {!isCardMode && (
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-red-500" />
+                  <span>
+                    Campos de {subcategory || 'Documento'} (Teudat Zeut, Licencia, Pasaporte, etc.)
+                  </span>
+                </span>
+                <span className="text-[10px] text-slate-400 font-semibold">
+                  Completar datos
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    🔢 N° de {subcategory || 'Documento / Licencia'}:
+                  </label>
+                  <input
+                    type="text"
+                    value={docNumber}
+                    onChange={(e) => setDocNumber(e.target.value)}
+                    placeholder="Ej: 312345678 / V-12345678"
+                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-red-500/30 focus:border-red-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    📅 Fecha de Vencimiento:
+                  </label>
+                  <input
+                    type="text"
+                    value={docExpiry}
+                    onChange={(e) => setDocExpiry(e.target.value)}
+                    placeholder="Ej: 15/08/2030"
+                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-red-500/30 focus:border-red-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    🌍 País / Entidad:
+                  </label>
+                  <input
+                    type="text"
+                    value={docCountry}
+                    onChange={(e) => setDocCountry(e.target.value)}
+                    placeholder="Ej: Israel / Venezuela / España"
+                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-red-500/30 focus:border-red-500"
+                  />
+                </div>
+              </div>
             </div>
           )}
 

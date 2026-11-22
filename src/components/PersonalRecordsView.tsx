@@ -22,6 +22,7 @@ import { Member, PersonalRecord, DataCategory, PasswordItem, CalendarTask } from
 import { PersonalRecordCard } from './PersonalRecordCard';
 import { ExcelTableViewer } from './ExcelTableViewer';
 import { MonthlyCalendarView } from './MonthlyCalendarView';
+import { JaimeWorldClock } from './JaimeWorldClock';
 import { sounds } from '../lib/sound';
 import { getMemberPostitColor, getMemberColorTheme } from '../lib/memberColors';
 import {
@@ -40,7 +41,7 @@ interface PersonalRecordsViewProps {
   activeMember: Member | null;
   isAdmin?: boolean;
   onSelectMember: (member: Member) => void;
-  onOpenAddRecord: (preset?: { category?: string; subcategory?: string }) => void;
+  onOpenAddRecord: (preset?: { memberId?: string; category?: string; subcategory?: string }) => void;
   onOpenSendRecord: (record?: PersonalRecord) => void;
   onOpenManageCategories: () => void;
   onAddCategory?: (category: Partial<DataCategory>) => Promise<void>;
@@ -196,8 +197,14 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
   const handleMemberChange = (id: string) => {
     setSelectedMemberId(id);
     if (id !== 'all') {
-      const found = members.find((m) => m.id === id);
-      if (found) onSelectMember(found);
+      const nextExpanded: Record<string, boolean> = { notas_claves: true };
+      categories.forEach((c) => {
+        nextExpanded[c.name] = true;
+      });
+      records.forEach((r) => {
+        if (r.category) nextExpanded[r.category] = true;
+      });
+      setExpandedCategories(nextExpanded);
     }
   };
 
@@ -457,7 +464,9 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
                 type="button"
                 onClick={() => {
                   onSelect();
-                  onOpenAddRecord();
+                  onOpenAddRecord({
+                    memberId: selectedMemberId !== 'all' ? selectedMemberId : undefined,
+                  });
                 }}
                 className="w-full py-2.5 px-3.5 rounded-2xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white text-xs font-black flex items-center justify-center gap-2 shadow-sm shadow-red-500/20 cursor-pointer transition-all group active:scale-98"
               >
@@ -590,6 +599,11 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
                       {m.name.charAt(0).toUpperCase()}
                     </div>
                     <span className="truncate">{m.name}</span>
+                    {(m.id === 'member_jaime' || m.name.toUpperCase() === 'JAIME') && (
+                      <span title="Reloj Mundial de Jaime" className="text-xs leading-none">
+                        🌍
+                      </span>
+                    )}
                   </div>
                   <span
                     className={`text-[11px] px-2 py-0.5 rounded-full font-extrabold shrink-0 ${
@@ -958,6 +972,12 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
             </div>
           )}
 
+          {/* ================= RELOJ MUNDIAL EXCLUSIVO DEL USUARIO JAIME ================= */}
+          {(selectedMemberId === 'member_jaime' ||
+            members.find((m) => m.id === selectedMemberId)?.name?.toUpperCase() === 'JAIME') && (
+            <JaimeWorldClock />
+          )}
+
           {/* ================= SECCIÓN 1: CALENDARIO MENSUAL Y TAREAS ================= */}
           {onToggleTaskComplete && onDeleteTask && (
             <MonthlyCalendarView
@@ -1010,6 +1030,41 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
                 </div>
               )}
             </div>
+
+            {/* Quick Fields Bar to introduce Teudat Zeut, Licencia, Pasaporte, Cédula, etc. for any user */}
+            {isAdmin && (
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-3 shadow-2xs flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wide mr-1">
+                  ➕ Introducir dato{selectedMemberId !== 'all' ? ` en ${members.find((m) => m.id === selectedMemberId)?.name || ''}` : ''}:
+                </span>
+                {[
+                  { label: '🪪 Teudat Zeut', category: 'Documentos de Identidad', subcategory: 'TEUDAT ZEUT' },
+                  { label: '🚗 Licencia de Conducir', category: 'Documentos de Identidad', subcategory: 'Licencia de Conducir' },
+                  { label: '🛂 Pasaporte', category: 'Documentos de Identidad', subcategory: 'Pasaporte' },
+                  { label: '🪪 Cédula', category: 'Documentos de Identidad', subcategory: 'Cédula' },
+                  { label: '📜 Partida Nacimiento', category: 'Documentos de Identidad', subcategory: 'Partida de Nacimiento' },
+                  { label: '💳 Tarjeta de Crédito', category: 'BANCO', subcategory: 'Tarjeta de Crédito' },
+                  { label: '🏦 Cuenta Bancaria', category: 'BANCO', subcategory: 'Cuentas Bancarias' },
+                  { label: '🚙 Vehículo / Póliza', category: 'VEHICULOS', subcategory: 'Título de Propiedad' },
+                  { label: '🏥 Salud / Medicina', category: 'Salud y Médicos', subcategory: 'MEDICINA' },
+                ].map((q) => (
+                  <button
+                    key={q.label}
+                    type="button"
+                    onClick={() =>
+                      onOpenAddRecord({
+                        memberId: selectedMemberId !== 'all' ? selectedMemberId : undefined,
+                        category: q.category,
+                        subcategory: q.subcategory,
+                      })
+                    }
+                    className="px-2.5 py-1 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/40 text-slate-700 dark:text-slate-200 hover:text-red-600 border border-slate-200 dark:border-slate-700 hover:border-red-300 text-[11px] font-bold transition-all cursor-pointer"
+                  >
+                    + {q.label}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {groupedCategories.length > 0 || showNotesGroup ? (
               <div className="space-y-4">
@@ -1467,7 +1522,10 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                onOpenAddRecord({ category: group.categoryName });
+                                onOpenAddRecord({
+                                  memberId: selectedMemberId !== 'all' ? selectedMemberId : undefined,
+                                  category: group.categoryName,
+                                });
                               }}
                               className="px-2.5 py-1 rounded-xl bg-white dark:bg-slate-900 text-red-600 border border-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 text-xs font-bold flex items-center gap-1 shadow-2xs transition-all cursor-pointer"
                               title={`Agregar dato en ${group.categoryName}`}

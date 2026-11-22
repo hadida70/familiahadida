@@ -119,6 +119,7 @@ export default function App() {
   // Personal Records Modals & Lightbox
   const [isAddPersonalRecordOpen, setIsAddPersonalRecordOpen] = useState(false);
   const [addRecordPreset, setAddRecordPreset] = useState<{
+    memberId?: string;
     category?: string;
     subcategory?: string;
   } | null>(null);
@@ -713,6 +714,7 @@ export default function App() {
         editingRecord={editingPersonalRecord}
         records={data.personalRecords || []}
         categories={data.dataCategories || []}
+        initialMemberId={addRecordPreset?.memberId}
         initialCategory={addRecordPreset?.category}
         initialSubcategory={addRecordPreset?.subcategory}
         onOpenManageCategories={() => setIsManageCategoriesOpen(true)}
