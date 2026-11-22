@@ -35,6 +35,7 @@ import { AdminPinPromptModal } from './components/AdminPinPromptModal';
 import { MinimalistTodoList } from './components/MinimalistTodoList';
 import { PasswordsView } from './components/PasswordsView';
 import { PasswordPinPromptModal } from './components/PasswordPinPromptModal';
+import { JaimeWorldClock } from './components/JaimeWorldClock';
 
 export default function App() {
   const {
@@ -464,6 +465,9 @@ export default function App() {
                 </span>
               )}
             </button>
+
+            {/* Reloj Mundial exclusivo para Jaime al lado de Claves */}
+            {isAdmin && <JaimeWorldClock />}
           </div>
 
           {/* Quick Notification Bell */}
