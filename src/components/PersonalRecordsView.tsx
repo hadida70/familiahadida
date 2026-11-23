@@ -763,22 +763,6 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
             </button>
           )}
         </div>
-
-        {/* Quick Summary Footnote */}
-        <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 space-y-1">
-          <div className="flex justify-between">
-            <span>📅 Tareas Calendario:</span>
-            <span className="font-bold text-slate-700 dark:text-slate-300">{tasks.length}</span>
-          </div>
-          <div className="flex justify-between">
-            <span>📄 Documentos:</span>
-            <span className="font-bold text-slate-700 dark:text-slate-300">{records.length}</span>
-          </div>
-          <div className="flex justify-between">
-            <span>📌 Claves:</span>
-            <span className="font-bold text-slate-700 dark:text-slate-300">{passwords.length}</span>
-          </div>
-        </div>
       </div>
     );
   };
@@ -1024,41 +1008,6 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
                 </div>
               )}
             </div>
-
-            {/* Quick Fields Bar to introduce Teudat Zeut, Licencia, Pasaporte, Cédula, etc. for any user */}
-            {isAdmin && (
-              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-3 shadow-2xs flex flex-wrap items-center gap-1.5">
-                <span className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wide mr-1">
-                  ➕ Introducir dato{selectedMemberId !== 'all' ? ` en ${members.find((m) => m.id === selectedMemberId)?.name || ''}` : ''}:
-                </span>
-                {[
-                  { label: '🪪 Teudat Zeut', category: 'Documentos de Identidad', subcategory: 'TEUDAT ZEUT' },
-                  { label: '🚗 Licencia de Conducir', category: 'Documentos de Identidad', subcategory: 'Licencia de Conducir' },
-                  { label: '🛂 Pasaporte', category: 'Documentos de Identidad', subcategory: 'Pasaporte' },
-                  { label: '🪪 Cédula', category: 'Documentos de Identidad', subcategory: 'Cédula' },
-                  { label: '📜 Partida Nacimiento', category: 'Documentos de Identidad', subcategory: 'Partida de Nacimiento' },
-                  { label: '💳 Tarjeta de Crédito', category: 'BANCO', subcategory: 'Tarjeta de Crédito' },
-                  { label: '🏦 Cuenta Bancaria', category: 'BANCO', subcategory: 'Cuentas Bancarias' },
-                  { label: '🚙 Vehículo / Póliza', category: 'VEHICULOS', subcategory: 'Título de Propiedad' },
-                  { label: '🏥 Salud / Medicina', category: 'Salud y Médicos', subcategory: 'MEDICINA' },
-                ].map((q) => (
-                  <button
-                    key={q.label}
-                    type="button"
-                    onClick={() =>
-                      onOpenAddRecord({
-                        memberId: selectedMemberId !== 'all' ? selectedMemberId : undefined,
-                        category: q.category,
-                        subcategory: q.subcategory,
-                      })
-                    }
-                    className="px-2.5 py-1 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/40 text-slate-700 dark:text-slate-200 hover:text-red-600 border border-slate-200 dark:border-slate-700 hover:border-red-300 text-[11px] font-bold transition-all cursor-pointer"
-                  >
-                    + {q.label}
-                  </button>
-                ))}
-              </div>
-            )}
 
             {groupedCategories.length > 0 || showNotesGroup ? (
               <div className="space-y-4">

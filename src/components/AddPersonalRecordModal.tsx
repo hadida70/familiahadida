@@ -850,64 +850,6 @@ export const AddPersonalRecordModal: React.FC<AddPersonalRecordModalProps> = ({
             </div>
           )}
 
-          {/* Structured Document Fields (Teudat Zeut, Licencia, Pasaporte, Cédula, etc.) */}
-          {!isCardMode && (
-            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-black text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5 text-red-500" />
-                  <span>
-                    Campos de {subcategory || 'Documento'} (Teudat Zeut, Licencia, Pasaporte, etc.)
-                  </span>
-                </span>
-                <span className="text-[10px] text-slate-400 font-semibold">
-                  Completar datos
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    🔢 N° de {subcategory || 'Documento / Licencia'}:
-                  </label>
-                  <input
-                    type="text"
-                    value={docNumber}
-                    onChange={(e) => setDocNumber(e.target.value)}
-                    placeholder="Ej: 312345678 / V-12345678"
-                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-red-500/30 focus:border-red-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    📅 Fecha de Vencimiento:
-                  </label>
-                  <input
-                    type="text"
-                    value={docExpiry}
-                    onChange={(e) => setDocExpiry(e.target.value)}
-                    placeholder="Ej: 15/08/2030"
-                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-red-500/30 focus:border-red-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    🌍 País / Entidad:
-                  </label>
-                  <input
-                    type="text"
-                    value={docCountry}
-                    onChange={(e) => setDocCountry(e.target.value)}
-                    placeholder="Ej: Israel / Venezuela / España"
-                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-red-500/30 focus:border-red-500"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Notes / Information field (Available for all records, bank accounts, instructions) */}
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
