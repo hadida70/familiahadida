@@ -712,15 +712,15 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
             )}
           </div>
 
-          {/* Bottom Section: Lista To-Do (Máximo 7 ítems: Urgente o Pendiente) */}
+          {/* Bottom Section: Lista To-Do (Máximo 7 ítems) */}
           <div className="border-t border-slate-200 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-800/20 flex flex-col">
             <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-1.5">
               <div className="flex items-center gap-1.5 min-w-0">
-                <div className="w-5 h-5 rounded-md bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
+                <div className="w-5 h-5 rounded-md bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-600 dark:text-red-400 shrink-0">
                   <CheckSquare className="w-3 h-3" />
                 </div>
                 <h4 className="text-[11px] font-extrabold text-slate-900 dark:text-white truncate">
-                  To-Do · Urgente / Pendiente
+                  To-Do
                 </h4>
               </div>
               <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 shrink-0">
@@ -729,30 +729,14 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
             </div>
 
             {onAddTodo && panelTodos.length < 7 && (
-              <form onSubmit={handleAddPanelTodo} className="p-2 pb-1 space-y-1.5">
+              <form onSubmit={handleAddPanelTodo} className="p-2 pb-1">
                 <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setNewTodoPriority((prev) => (prev === 'Urgente' ? 'Pendiente' : 'Urgente'))
-                    }
-                    className={`px-1.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-tight border transition-all cursor-pointer shrink-0 flex items-center gap-0.5 ${
-                      newTodoPriority === 'Urgente'
-                        ? 'bg-red-600 text-white border-red-600 shadow-2xs'
-                        : 'bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-800'
-                    }`}
-                    title="Clic para cambiar entre Urgente y Pendiente"
-                  >
-                    <AlertCircle className="w-2.5 h-2.5" />
-                    <span>{newTodoPriority}</span>
-                  </button>
-
                   <input
                     type="text"
                     value={newTodoText}
                     onChange={(e) => setNewTodoText(e.target.value)}
                     placeholder="Agregar to-do..."
-                    className="flex-1 min-w-0 px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[11px] font-medium text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-red-500"
+                    className="flex-1 min-w-0 px-2.5 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[11px] font-medium text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-red-500"
                   />
 
                   <button
@@ -770,15 +754,12 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
             <div className="p-2 space-y-1 max-h-[230px] overflow-y-auto">
               {panelTodos.length > 0 ? (
                 panelTodos.map((todo) => {
-                  const isUrgent = todo.category === 'panel_urgente';
                   return (
                     <div
                       key={todo.id}
                       className={`px-2 py-1.5 rounded-xl border transition-all group flex items-center justify-between gap-1.5 ${
                         todo.completed
                           ? 'bg-slate-100/60 dark:bg-slate-900/40 border-slate-200/70 dark:border-slate-800 opacity-60'
-                          : isUrgent
-                          ? 'bg-red-50/40 dark:bg-red-950/20 border-red-200/80 dark:border-red-900/50'
                           : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'
                       }`}
                     >
@@ -789,31 +770,13 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
                             onUpdateTodo && onUpdateTodo(todo.id, { completed: !todo.completed })
                           }
                           className="text-red-600 hover:text-red-700 shrink-0 cursor-pointer"
-                          title={todo.completed ? 'Marcar pendiente' : 'Marcar completado'}
+                          title={todo.completed ? 'Desmarcar' : 'Marcar completado'}
                         >
                           {todo.completed ? (
                             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 fill-emerald-100 dark:fill-emerald-950" />
                           ) : (
                             <Circle className="w-3.5 h-3.5" />
                           )}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            onUpdateTodo &&
-                            onUpdateTodo(todo.id, {
-                              category: isUrgent ? 'panel_pendiente' : 'panel_urgente',
-                            })
-                          }
-                          className={`px-1.5 py-0.2 rounded text-[8px] font-black uppercase tracking-tight shrink-0 cursor-pointer border ${
-                            isUrgent
-                              ? 'bg-red-600 text-white border-red-600'
-                              : 'bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-800'
-                          }`}
-                          title="Clic para cambiar entre Urgente y Pendiente"
-                        >
-                          {isUrgent ? 'URGENTE' : 'PENDIENTE'}
                         </button>
 
                         <span
@@ -843,7 +806,7 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
                 })
               ) : (
                 <p className="text-[10px] text-slate-400 text-center py-2">
-                  Sin ítems pendientes (máx. 7)
+                  Sin ítems (máx. 7)
                 </p>
               )}
             </div>
