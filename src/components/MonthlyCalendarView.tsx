@@ -128,15 +128,16 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
     return todos
       .filter(
         (t) =>
-          selectedMemberFilter === 'all' ||
-          !t.assignedToId ||
-          t.assignedToId === 'all' ||
-          t.assignedToId === selectedMemberFilter
+          (t.category === 'panel_urgente' || t.category === 'panel_pendiente') &&
+          (selectedMemberFilter === 'all' ||
+            !t.assignedToId ||
+            t.assignedToId === 'all' ||
+            t.assignedToId === selectedMemberFilter)
       )
       .sort((a, b) => {
         if (a.completed !== b.completed) return a.completed ? 1 : -1;
-        const aUrg = (a.category || '').toLowerCase() === 'urgente' ? 0 : 1;
-        const bUrg = (b.category || '').toLowerCase() === 'urgente' ? 0 : 1;
+        const aUrg = a.category === 'panel_urgente' ? 0 : 1;
+        const bUrg = b.category === 'panel_urgente' ? 0 : 1;
         return aUrg - bUrg;
       })
       .slice(0, 7);
@@ -148,7 +149,7 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
     onAddTodo({
       text: newTodoText.trim(),
       completed: false,
-      category: newTodoPriority,
+      category: newTodoPriority === 'Urgente' ? 'panel_urgente' : 'panel_pendiente',
       assignedToId: selectedMemberFilter !== 'all' ? selectedMemberFilter : 'all',
     });
     setNewTodoText('');
@@ -769,7 +770,7 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
             <div className="p-2 space-y-1 max-h-[230px] overflow-y-auto">
               {panelTodos.length > 0 ? (
                 panelTodos.map((todo) => {
-                  const isUrgent = (todo.category || '').toLowerCase() === 'urgente';
+                  const isUrgent = todo.category === 'panel_urgente';
                   return (
                     <div
                       key={todo.id}
@@ -802,7 +803,7 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
                           onClick={() =>
                             onUpdateTodo &&
                             onUpdateTodo(todo.id, {
-                              category: isUrgent ? 'Pendiente' : 'Urgente',
+                              category: isUrgent ? 'panel_pendiente' : 'panel_urgente',
                             })
                           }
                           className={`px-1.5 py-0.2 rounded text-[8px] font-black uppercase tracking-tight shrink-0 cursor-pointer border ${

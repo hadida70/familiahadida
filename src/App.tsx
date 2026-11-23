@@ -321,7 +321,11 @@ export default function App() {
   const totalPersonalRecords = data.personalRecords ? data.personalRecords.length : 0;
   const totalTasks = data.calendarTasks ? data.calendarTasks.length : 0;
   const totalContacts = data.contacts ? data.contacts.length : 0;
-  const pendingTodos = data.todos ? data.todos.filter((t) => !t.completed).length : 0;
+  const pendingTodos = data.todos
+    ? data.todos.filter(
+        (t) => !t.completed && t.category !== 'panel_urgente' && t.category !== 'panel_pendiente'
+      ).length
+    : 0;
   const totalPasswords = data.passwords ? data.passwords.length : 0;
   const totalItems = data.items ? data.items.filter((i) => !i.completed).length : 0;
   const isUnifiedHomeActive = activeTab === 'calendar' || activeTab === 'personal_data';

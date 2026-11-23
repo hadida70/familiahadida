@@ -43,8 +43,15 @@ export const MinimalistTodoList: React.FC<MinimalistTodoListProps> = ({
   // Confirmation state for clearing
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
+  // Exclude independent panel todos (panel_urgente / panel_pendiente)
+  const mainTodos = useMemo(() => {
+    return todos.filter(
+      (t) => t.category !== 'panel_urgente' && t.category !== 'panel_pendiente'
+    );
+  }, [todos]);
+
   // Completed statistics
-  const completedCount = todos.filter((t) => t.completed).length;
+  const completedCount = mainTodos.filter((t) => t.completed).length;
 
   // Handle Add Todo
   const handleAddSubmit = (e: React.FormEvent) => {
@@ -83,10 +90,10 @@ export const MinimalistTodoList: React.FC<MinimalistTodoListProps> = ({
 
   // Filtered Todos (only by search query)
   const filteredTodos = useMemo(() => {
-    if (!searchQuery.trim()) return todos;
+    if (!searchQuery.trim()) return mainTodos;
     const q = searchQuery.toLowerCase();
-    return todos.filter((todo) => todo.text.toLowerCase().includes(q));
-  }, [todos, searchQuery]);
+    return mainTodos.filter((todo) => todo.text.toLowerCase().includes(q));
+  }, [mainTodos, searchQuery]);
 
   return (
     <div className="w-full max-w-2xl mx-auto space-y-3 pb-16">
@@ -115,10 +122,10 @@ export const MinimalistTodoList: React.FC<MinimalistTodoListProps> = ({
       </form>
 
       {/* Sub-bar: Search & Clear completed if available */}
-      {(todos.length > 3 || completedCount > 0) && (
+      {(mainTodos.length > 3 || completedCount > 0) && (
         <div className="flex items-center justify-between gap-2 px-1">
           {/* Search if more than 3 items */}
-          {todos.length > 3 ? (
+          {mainTodos.length > 3 ? (
             <div className="relative flex-1 max-w-xs">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
               <input
