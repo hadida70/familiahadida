@@ -504,6 +504,7 @@ export default function App() {
             records={data.personalRecords || []}
             passwords={data.passwords || []}
             tasks={data.calendarTasks || []}
+            todos={data.todos || []}
             members={data.members}
             categories={data.dataCategories || []}
             activeMember={activeMember}
@@ -537,6 +538,9 @@ export default function App() {
             onToggleTaskComplete={handleToggleTaskComplete}
             onDeleteTask={deleteTask}
             onSendTaskAlert={handleSendTaskAlert}
+            onAddTodo={addTodo}
+            onUpdateTodo={updateTodo}
+            onDeleteTodo={deleteTodo}
             fontSize={fontSize}
           />
         ) : activeTab === 'lists' ? (

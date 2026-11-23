@@ -12,12 +12,15 @@ import {
   Check,
   X,
   Clock,
+  CheckSquare,
+  AlertCircle,
 } from 'lucide-react';
-import { CalendarTask, Member } from '../types';
+import { CalendarTask, Member, TodoItem } from '../types';
 import { getMemberColorTheme } from '../lib/memberColors';
 
 interface MonthlyCalendarViewProps {
   tasks: CalendarTask[];
+  todos?: TodoItem[];
   members: Member[];
   activeMember: Member | null;
   isAdmin?: boolean;
@@ -29,6 +32,9 @@ interface MonthlyCalendarViewProps {
   onToggleComplete: (task: CalendarTask) => void;
   onDeleteTask: (id: string) => void;
   onSendTaskAlert?: (task: CalendarTask) => void;
+  onAddTodo?: (todo: Partial<TodoItem>) => void;
+  onUpdateTodo?: (id: string, updates: Partial<TodoItem>) => void;
+  onDeleteTodo?: (id: string) => void;
   fontSize?: 'normal' | 'large' | 'xlarge';
 }
 
@@ -66,6 +72,7 @@ const WEEKDAY_NAMES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
 export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
   tasks,
+  todos = [],
   members,
   activeMember,
   isAdmin = false,
@@ -77,6 +84,9 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
   onToggleComplete,
   onDeleteTask,
   onSendTaskAlert,
+  onAddTodo,
+  onUpdateTodo,
+  onDeleteTodo,
 }) => {
   const today = new Date();
   const [currentYear, setCurrentYear] = useState<number>(today.getFullYear());
@@ -109,6 +119,40 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
   // Inline editing state for existing tasks
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState<string>('');
+
+  // Bottom To-Do (max 7 items: Urgente / Pendiente) state
+  const [newTodoText, setNewTodoText] = useState<string>('');
+  const [newTodoPriority, setNewTodoPriority] = useState<'Urgente' | 'Pendiente'>('Pendiente');
+
+  const panelTodos = useMemo(() => {
+    return todos
+      .filter(
+        (t) =>
+          selectedMemberFilter === 'all' ||
+          !t.assignedToId ||
+          t.assignedToId === 'all' ||
+          t.assignedToId === selectedMemberFilter
+      )
+      .sort((a, b) => {
+        if (a.completed !== b.completed) return a.completed ? 1 : -1;
+        const aUrg = (a.category || '').toLowerCase() === 'urgente' ? 0 : 1;
+        const bUrg = (b.category || '').toLowerCase() === 'urgente' ? 0 : 1;
+        return aUrg - bUrg;
+      })
+      .slice(0, 7);
+  }, [todos, selectedMemberFilter]);
+
+  const handleAddPanelTodo = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTodoText.trim() || !onAddTodo || panelTodos.length >= 7) return;
+    onAddTodo({
+      text: newTodoText.trim(),
+      completed: false,
+      category: newTodoPriority,
+      assignedToId: selectedMemberFilter !== 'all' ? selectedMemberFilter : 'all',
+    });
+    setNewTodoText('');
+  };
 
   const handlePrevMonth = () => {
     if (currentMonth === 0) {
@@ -255,8 +299,38 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
     });
   }, [tasks, selectedDate, selectedMemberFilter]);
 
+  // Next 7 Upcoming Events for the right-hand fast-reading panel
   // Next 7 Upcoming Events for the right-hand fast-reading panel (strictly today or future dates)
   const upcomingSevenEvents = useMemo(() => {
+    const memberFiltered = tasks.filter(
+      (t) => selectedMemberFilter === 'all' || t.assignedToId === selectedMemberFilter
+    );
+
+    // 1. Future or today uncompleted tasks (sorted ascending by date, then time)
+    const futureUncompleted = memberFiltered
+      .filter((t) => !t.completed && t.date >= todayString)
+      .sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''));
+
+    if (futureUncompleted.length >= 7) {
+      return futureUncompleted.slice(0, 7);
+    }
+
+    // 2. If fewer than 7, include recent uncompleted tasks so no active event is missed
+    const pastUncompleted = memberFiltered
+      .filter((t) => !t.completed && t.date < todayString)
+      .sort((a, b) => b.date.localeCompare(a.date));
+
+    const combined = [...futureUncompleted, ...pastUncompleted];
+    if (combined.length >= 7) {
+      return combined.slice(0, 7);
+    }
+
+    // 3. If still fewer than 7, fill with future completed tasks
+    const futureCompleted = memberFiltered
+      .filter((t) => t.completed && t.date >= todayString)
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    return [...combined, ...futureCompleted].slice(0, 7);
     return tasks
       .filter(
         (t) =>
@@ -635,6 +709,143 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
                 </p>
               </div>
             )}
+          </div>
+
+          {/* Bottom Section: Lista To-Do (Máximo 7 ítems: Urgente o Pendiente) */}
+          <div className="border-t border-slate-200 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-800/20 flex flex-col">
+            <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-1.5">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <div className="w-5 h-5 rounded-md bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
+                  <CheckSquare className="w-3 h-3" />
+                </div>
+                <h4 className="text-[11px] font-extrabold text-slate-900 dark:text-white truncate">
+                  To-Do · Urgente / Pendiente
+                </h4>
+              </div>
+              <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 shrink-0">
+                {panelTodos.length}/7
+              </span>
+            </div>
+
+            {onAddTodo && panelTodos.length < 7 && (
+              <form onSubmit={handleAddPanelTodo} className="p-2 pb-1 space-y-1.5">
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setNewTodoPriority((prev) => (prev === 'Urgente' ? 'Pendiente' : 'Urgente'))
+                    }
+                    className={`px-1.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-tight border transition-all cursor-pointer shrink-0 flex items-center gap-0.5 ${
+                      newTodoPriority === 'Urgente'
+                        ? 'bg-red-600 text-white border-red-600 shadow-2xs'
+                        : 'bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-800'
+                    }`}
+                    title="Clic para cambiar entre Urgente y Pendiente"
+                  >
+                    <AlertCircle className="w-2.5 h-2.5" />
+                    <span>{newTodoPriority}</span>
+                  </button>
+
+                  <input
+                    type="text"
+                    value={newTodoText}
+                    onChange={(e) => setNewTodoText(e.target.value)}
+                    placeholder="Agregar to-do..."
+                    className="flex-1 min-w-0 px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[11px] font-medium text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  />
+
+                  <button
+                    type="submit"
+                    disabled={!newTodoText.trim()}
+                    className="p-1 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white transition-all cursor-pointer shrink-0"
+                    title="Agregar a la lista"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </form>
+            )}
+
+            <div className="p-2 space-y-1 max-h-[230px] overflow-y-auto">
+              {panelTodos.length > 0 ? (
+                panelTodos.map((todo) => {
+                  const isUrgent = (todo.category || '').toLowerCase() === 'urgente';
+                  return (
+                    <div
+                      key={todo.id}
+                      className={`px-2 py-1.5 rounded-xl border transition-all group flex items-center justify-between gap-1.5 ${
+                        todo.completed
+                          ? 'bg-slate-100/60 dark:bg-slate-900/40 border-slate-200/70 dark:border-slate-800 opacity-60'
+                          : isUrgent
+                          ? 'bg-red-50/40 dark:bg-red-950/20 border-red-200/80 dark:border-red-900/50'
+                          : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onUpdateTodo && onUpdateTodo(todo.id, { completed: !todo.completed })
+                          }
+                          className="text-red-600 hover:text-red-700 shrink-0 cursor-pointer"
+                          title={todo.completed ? 'Marcar pendiente' : 'Marcar completado'}
+                        >
+                          {todo.completed ? (
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 fill-emerald-100 dark:fill-emerald-950" />
+                          ) : (
+                            <Circle className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onUpdateTodo &&
+                            onUpdateTodo(todo.id, {
+                              category: isUrgent ? 'Pendiente' : 'Urgente',
+                            })
+                          }
+                          className={`px-1.5 py-0.2 rounded text-[8px] font-black uppercase tracking-tight shrink-0 cursor-pointer border ${
+                            isUrgent
+                              ? 'bg-red-600 text-white border-red-600'
+                              : 'bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-800'
+                          }`}
+                          title="Clic para cambiar entre Urgente y Pendiente"
+                        >
+                          {isUrgent ? 'URGENTE' : 'PENDIENTE'}
+                        </button>
+
+                        <span
+                          className={`text-[11px] font-bold truncate ${
+                            todo.completed
+                              ? 'line-through text-slate-400 dark:text-slate-500'
+                              : 'text-slate-800 dark:text-slate-100'
+                          }`}
+                          title={todo.text}
+                        >
+                          {todo.text}
+                        </span>
+                      </div>
+
+                      {onDeleteTodo && (
+                        <button
+                          type="button"
+                          onClick={() => onDeleteTodo(todo.id)}
+                          className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all shrink-0 cursor-pointer"
+                          title="Eliminar ítem"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="text-[10px] text-slate-400 text-center py-2">
+                  Sin ítems pendientes (máx. 7)
+                </p>
+              )}
+            </div>
           </div>
         </div>
       </div>

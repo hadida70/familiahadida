@@ -18,7 +18,7 @@ import {
   Menu,
   Calendar as CalendarIcon,
 } from 'lucide-react';
-import { Member, PersonalRecord, DataCategory, PasswordItem, CalendarTask } from '../types';
+import { Member, PersonalRecord, DataCategory, PasswordItem, CalendarTask, TodoItem } from '../types';
 import { PersonalRecordCard } from './PersonalRecordCard';
 import { ExcelTableViewer } from './ExcelTableViewer';
 import { MonthlyCalendarView } from './MonthlyCalendarView';
@@ -36,6 +36,7 @@ interface PersonalRecordsViewProps {
   records: PersonalRecord[];
   passwords?: PasswordItem[];
   tasks?: CalendarTask[];
+  todos?: TodoItem[];
   members: Member[];
   categories?: DataCategory[];
   activeMember: Member | null;
@@ -58,6 +59,9 @@ interface PersonalRecordsViewProps {
   onToggleTaskComplete?: (task: CalendarTask) => void;
   onDeleteTask?: (id: string) => void;
   onSendTaskAlert?: (task: CalendarTask) => void;
+  onAddTodo?: (todo: Partial<TodoItem>) => void;
+  onUpdateTodo?: (id: string, updates: Partial<TodoItem>) => void;
+  onDeleteTodo?: (id: string) => void;
   fontSize?: 'normal' | 'large' | 'xlarge';
 }
 
@@ -145,6 +149,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
   records,
   passwords = [],
   tasks = [],
+  todos = [],
   members,
   categories = [],
   activeMember,
@@ -165,6 +170,9 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
   onToggleTaskComplete,
   onDeleteTask,
   onSendTaskAlert,
+  onAddTodo,
+  onUpdateTodo,
+  onDeleteTodo,
   fontSize = 'normal',
 }) => {
   const [selectedMemberId, setSelectedMemberId] = useState<string>('all');
@@ -960,6 +968,7 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
           {onToggleTaskComplete && onDeleteTask && (
             <MonthlyCalendarView
               tasks={tasks}
+              todos={todos}
               members={members}
               activeMember={activeMember}
               isAdmin={isAdmin}
@@ -971,6 +980,9 @@ export const PersonalRecordsView: React.FC<PersonalRecordsViewProps> = ({
               onToggleComplete={onToggleTaskComplete}
               onDeleteTask={onDeleteTask}
               onSendTaskAlert={onSendTaskAlert}
+              onAddTodo={onAddTodo}
+              onUpdateTodo={onUpdateTodo}
+              onDeleteTodo={onDeleteTodo}
               fontSize={fontSize}
             />
           )}
