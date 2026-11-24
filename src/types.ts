@@ -133,6 +133,7 @@ export interface TodoItem {
   completed: boolean;
   assignedToId?: string; // member ID or 'all'
   category?: string; // e.g. 'General', 'Hogar', 'Urgente', 'Personal'
+  imageUrl?: string; // Optional photo / image attached to the todo item
   dueDate?: string;
   completedAt?: string;
   createdAt: string;

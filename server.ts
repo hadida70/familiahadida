@@ -795,17 +795,18 @@ async function startServer() {
 
   // POST /api/todos - Create todo
   app.post('/api/todos', (req, res) => {
-    const { text, assignedToId, category, dueDate } = req.body;
-    if (!text || !text.trim()) {
-      return res.status(400).json({ error: 'El texto de la tarea es obligatorio' });
+    const { text, assignedToId, category, imageUrl, dueDate } = req.body;
+    if ((!text || !text.trim()) && !imageUrl) {
+      return res.status(400).json({ error: 'El texto o la imagen de la tarea es obligatorio' });
     }
 
     const newTodo: TodoItem = {
       id: 'todo_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
-      text: text.trim(),
+      text: text && text.trim() ? text.trim() : '📷 Imagen',
       completed: false,
       assignedToId: assignedToId || 'all',
       category: category || 'General',
+      imageUrl: imageUrl || '',
       dueDate: dueDate || undefined,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

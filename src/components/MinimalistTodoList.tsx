@@ -9,6 +9,8 @@ import {
   X,
   Search,
   CheckCircle2,
+  Camera,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { TodoItem, Member } from '../types';
 import { sounds } from '../lib/sound';
@@ -24,6 +26,42 @@ interface MinimalistTodoListProps {
   onClearCompleted: () => void;
 }
 
+function compressImageToDataUrl(file: File, maxDim = 1280): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = (e.target?.result as string) || '';
+      if (!file.type.startsWith('image/')) {
+        resolve(dataUrl);
+        return;
+      }
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          const ratio = Math.min(maxDim / width, maxDim / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(dataUrl);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.82));
+      };
+      img.onerror = () => resolve(dataUrl);
+      img.src = dataUrl;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 export const MinimalistTodoList: React.FC<MinimalistTodoListProps> = ({
   todos = [],
   onAddTodo,
@@ -33,8 +71,13 @@ export const MinimalistTodoList: React.FC<MinimalistTodoListProps> = ({
 }) => {
   // Input state
   const [newText, setNewText] = useState('');
+  const [newImageUrl, setNewImageUrl] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const newFileInputRef = useRef<HTMLInputElement | null>(null);
+  const itemFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [attachingTodoId, setAttachingTodoId] = useState<string | null>(null);
+  const [previewImageTodo, setPreviewImageTodo] = useState<TodoItem | null>(null);
 
   // Editing state
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -56,17 +99,46 @@ export const MinimalistTodoList: React.FC<MinimalistTodoListProps> = ({
   // Handle Add Todo
   const handleAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newText.trim()) return;
+    if (!newText.trim() && !newImageUrl) return;
 
     onAddTodo({
-      text: newText.trim(),
+      text: newText.trim() || '📷 Foto / Imagen',
       completed: false,
+      imageUrl: newImageUrl || '',
     });
 
     setNewText('');
+    setNewImageUrl('');
     setTimeout(() => {
       inputRef.current?.focus();
     }, 10);
+  };
+
+  const handleNewImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const dataUrl = await compressImageToDataUrl(file);
+      setNewImageUrl(dataUrl);
+    } catch (err) {
+      console.error('Error loading image:', err);
+    } finally {
+      if (newFileInputRef.current) newFileInputRef.current.value = '';
+    }
+  };
+
+  const handleItemImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !attachingTodoId) return;
+    try {
+      const dataUrl = await compressImageToDataUrl(file);
+      onUpdateTodo(attachingTodoId, { imageUrl: dataUrl });
+    } catch (err) {
+      console.error('Error attaching image to todo:', err);
+    } finally {
+      setAttachingTodoId(null);
+      if (itemFileInputRef.current) itemFileInputRef.current.value = '';
+    }
   };
 
   // Handle Toggle Complete
@@ -97,28 +169,88 @@ export const MinimalistTodoList: React.FC<MinimalistTodoListProps> = ({
 
   return (
     <div className="w-full max-w-2xl mx-auto space-y-3 pb-16">
-      {/* 1. Directly the Input Form to Write the Task */}
+      {/* Hidden file inputs for new item image and existing item image */}
+      <input
+        ref={newFileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleNewImageSelect}
+        className="hidden"
+      />
+      <input
+        ref={itemFileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleItemImageSelect}
+        className="hidden"
+      />
+
+      {/* 1. Directly the Input Form to Write the Task + Attach Photo/Image */}
       <form
         onSubmit={handleAddSubmit}
-        className="bg-white dark:bg-slate-900 rounded-2xl p-2 sm:p-2.5 border border-slate-200/90 dark:border-slate-800 shadow-xs flex items-center gap-2"
+        className="bg-white dark:bg-slate-900 rounded-2xl p-2 sm:p-2.5 border border-slate-200/90 dark:border-slate-800 shadow-xs space-y-2"
       >
-        <input
-          ref={inputRef}
-          type="text"
-          value={newText}
-          onChange={(e) => setNewText(e.target.value)}
-          placeholder="Escribe una tarea y presiona Enter..."
-          autoFocus
-          className="flex-1 px-3.5 py-2.5 bg-transparent text-slate-900 dark:text-white placeholder-slate-400 text-sm sm:text-base font-medium outline-none"
-        />
-        <button
-          type="submit"
-          disabled={!newText.trim()}
-          className="px-4 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white rounded-xl font-bold text-xs sm:text-sm flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer shrink-0"
-        >
-          <Plus className="w-4 h-4 stroke-[3]" />
-          <span>Agregar</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <input
+            ref={inputRef}
+            type="text"
+            value={newText}
+            onChange={(e) => setNewText(e.target.value)}
+            placeholder="Escribe una tarea y presiona Enter..."
+            autoFocus
+            className="flex-1 px-3.5 py-2.5 bg-transparent text-slate-900 dark:text-white placeholder-slate-400 text-sm sm:text-base font-medium outline-none"
+          />
+
+          <button
+            type="button"
+            onClick={() => newFileInputRef.current?.click()}
+            className={`px-3 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 border transition-all cursor-pointer shrink-0 ${
+              newImageUrl
+                ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
+                : 'bg-slate-100 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/40 text-slate-700 dark:text-slate-200 hover:text-red-600 border-slate-200 dark:border-slate-700'
+            }`}
+            title="Incluir foto / agregar imagen"
+          >
+            <Camera className="w-4 h-4 text-red-600" />
+            <span className="hidden sm:inline">{newImageUrl ? 'Foto lista' : 'Foto / Imagen'}</span>
+          </button>
+
+          <button
+            type="submit"
+            disabled={!newText.trim() && !newImageUrl}
+            className="px-4 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white rounded-xl font-bold text-xs sm:text-sm flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer shrink-0"
+          >
+            <Plus className="w-4 h-4 stroke-[3]" />
+            <span>Agregar</span>
+          </button>
+        </div>
+
+        {/* Selected photo preview before saving */}
+        {newImageUrl && (
+          <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+            <img
+              src={newImageUrl}
+              alt="Vista previa"
+              className="w-12 h-12 rounded-lg object-cover border border-slate-200 dark:border-slate-700"
+            />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                📷 Imagen adjunta lista para agregar
+              </p>
+              <p className="text-[11px] text-slate-400">
+                Presiona Agregar o Enter para guardar la tarea con su foto
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setNewImageUrl('')}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer"
+              title="Quitar imagen"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
       </form>
 
       {/* Sub-bar: Search & Clear completed if available */}
@@ -210,7 +342,7 @@ export const MinimalistTodoList: React.FC<MinimalistTodoListProps> = ({
                       : 'border-slate-200/90 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
                   }`}
                 >
-                  {/* Left: Checkbox & Text */}
+                  {/* Left: Checkbox, Image Thumbnail & Text */}
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <button
                       type="button"
@@ -228,6 +360,22 @@ export const MinimalistTodoList: React.FC<MinimalistTodoListProps> = ({
                         <Square className="w-5 h-5 stroke-[2]" />
                       )}
                     </button>
+
+                    {/* Attached Photo Thumbnail */}
+                    {todo.imageUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setPreviewImageTodo(todo)}
+                        className="relative w-11 h-11 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shrink-0 group/img cursor-pointer shadow-2xs"
+                        title="Ver imagen"
+                      >
+                        <img
+                          src={todo.imageUrl}
+                          alt={todo.text}
+                          className="w-full h-full object-cover group-hover/img:scale-105 transition-transform"
+                        />
+                      </button>
+                    )}
 
                     {/* Content or Edit Input */}
                     {isEditing ? (
@@ -278,6 +426,18 @@ export const MinimalistTodoList: React.FC<MinimalistTodoListProps> = ({
                       <button
                         type="button"
                         onClick={() => {
+                          setAttachingTodoId(todo.id);
+                          itemFileInputRef.current?.click();
+                        }}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
+                        title={todo.imageUrl ? 'Cambiar foto / imagen' : 'Agregar foto / imagen'}
+                      >
+                        <ImageIcon className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
                           setEditingId(todo.id);
                           setEditingText(todo.text);
                         }}
@@ -303,6 +463,52 @@ export const MinimalistTodoList: React.FC<MinimalistTodoListProps> = ({
           ) : null}
         </AnimatePresence>
       </div>
+
+      {/* Full-screen Photo Preview Modal */}
+      {previewImageTodo && previewImageTodo.imageUrl && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={() => setPreviewImageTodo(null)}
+        >
+          <div
+            className="relative bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 max-w-2xl w-full overflow-hidden shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+              <p className="text-sm font-extrabold text-slate-900 dark:text-white truncate">
+                {previewImageTodo.text}
+              </p>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onUpdateTodo(previewImageTodo.id, { imageUrl: '' });
+                    setPreviewImageTodo(null);
+                  }}
+                  className="px-2.5 py-1 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 cursor-pointer flex items-center gap-1"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Quitar foto</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewImageTodo(null)}
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <div className="p-3 bg-slate-950 flex items-center justify-center max-h-[75vh] overflow-auto">
+              <img
+                src={previewImageTodo.imageUrl}
+                alt={previewImageTodo.text}
+                className="max-h-[70vh] w-auto object-contain rounded-xl"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

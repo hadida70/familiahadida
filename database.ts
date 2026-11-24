@@ -348,12 +348,19 @@ export function initDatabase() {
       completed INTEGER DEFAULT 0,
       assigned_to_id TEXT DEFAULT 'all',
       category TEXT DEFAULT 'General',
+      image_url TEXT DEFAULT '',
       due_date TEXT,
       completed_at TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT
     );
   `);
+
+  try {
+    db.exec(`ALTER TABLE todos ADD COLUMN image_url TEXT DEFAULT ''`);
+  } catch {
+    // Column already exists
+  }
 
   // 9. Notifications table
   db.exec(`
@@ -1533,7 +1540,7 @@ export function getAllAppData(): AppData {
   const catRows = db.prepare('SELECT id, name, icon, color, description, subcategories_json, is_default as isDefault, created_at as createdAt FROM data_categories ORDER BY is_default DESC, name ASC').all() as any[];
   const taskRows = db.prepare('SELECT id, title, description, date, time, assigned_to_id as assignedToId, completed, completed_at as completedAt, category, urgent, created_at as createdAt, updated_at as updatedAt FROM calendar_tasks ORDER BY date ASC, time ASC').all() as any[];
   const contactRows = db.prepare('SELECT id, name, phone, email, notes, address, place_name as placeName, created_at as createdAt, updated_at as updatedAt FROM contacts ORDER BY name ASC').all() as Contact[];
-  const todoRows = db.prepare('SELECT id, text, completed, assigned_to_id as assignedToId, category, due_date as dueDate, completed_at as completedAt, created_at as createdAt, updated_at as updatedAt FROM todos ORDER BY created_at DESC').all() as any[];
+  const todoRows = db.prepare('SELECT id, text, completed, assigned_to_id as assignedToId, category, image_url as imageUrl, due_date as dueDate, completed_at as completedAt, created_at as createdAt, updated_at as updatedAt FROM todos ORDER BY created_at DESC').all() as any[];
   const passwordRows = db.prepare('SELECT id, website, email, password, notes, category, member_id as memberId, color, created_at as createdAt, updated_at as updatedAt FROM passwords ORDER BY created_at DESC').all() as PasswordItem[];
   const notifRows = db.prepare('SELECT id, recipient_id as recipientId, title, message, timestamp, read, type, item_id as itemId, list_id as listId, task_id as taskId FROM notifications ORDER BY timestamp DESC LIMIT 50').all() as any[];
 
@@ -2240,11 +2247,36 @@ export function deleteContact(id: string): boolean {
 }
 
 // Todos
+function saveTodoImageToDisk(imageUrl: string | undefined, todoId: string): string {
+  if (!imageUrl) return '';
+  if (!imageUrl.startsWith('data:image/')) return imageUrl;
+  try {
+    const matches = imageUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+    if (!matches) return imageUrl;
+    const mime = matches[1].toLowerCase();
+    const rawBuf = Buffer.from(matches[2], 'base64');
+    let ext = '.jpg';
+    if (mime.includes('png')) ext = '.png';
+    else if (mime.includes('webp')) ext = '.webp';
+    else if (mime.includes('gif')) ext = '.gif';
+    const safeId = todoId.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const fileName = `todo_img_${safeId}_${Date.now()}${ext}`;
+    const filePath = path.join(UPLOADS_DIR, fileName);
+    fs.writeFileSync(filePath, rawBuf);
+    return `/uploads/${fileName}`;
+  } catch (err) {
+    console.error('Error saving todo image to disk:', err);
+    return imageUrl;
+  }
+}
+
 export function insertTodo(todo: TodoItem) {
+  const storedImageUrl = saveTodoImageToDisk(todo.imageUrl, todo.id);
+  todo.imageUrl = storedImageUrl;
   db.prepare(`
-    INSERT INTO todos (id, text, completed, assigned_to_id, category, due_date, completed_at, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(todo.id, todo.text, todo.completed ? 1 : 0, todo.assignedToId || 'all', todo.category || 'General', todo.dueDate || null, todo.completedAt || null, todo.createdAt, todo.updatedAt || null);
+    INSERT INTO todos (id, text, completed, assigned_to_id, category, image_url, due_date, completed_at, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(todo.id, todo.text, todo.completed ? 1 : 0, todo.assignedToId || 'all', todo.category || 'General', storedImageUrl, todo.dueDate || null, todo.completedAt || null, todo.createdAt, todo.updatedAt || null);
 }
 
 export function updateTodo(id: string, updates: Partial<TodoItem>) {
@@ -2256,12 +2288,16 @@ export function updateTodo(id: string, updates: Partial<TodoItem>) {
   const completedAt = updates.completed !== undefined ? (updates.completed ? (updates.completedAt || new Date().toISOString()) : null) : current.completed_at;
   const assignedToId = updates.assignedToId !== undefined ? updates.assignedToId : current.assigned_to_id;
   const category = updates.category !== undefined ? updates.category : current.category;
+  const imageUrl =
+    updates.imageUrl !== undefined
+      ? saveTodoImageToDisk(updates.imageUrl, id)
+      : current.image_url || '';
   const dueDate = updates.dueDate !== undefined ? updates.dueDate : current.due_date;
   const updatedAt = new Date().toISOString();
 
   db.prepare(`
-    UPDATE todos SET text = ?, completed = ?, completed_at = ?, assigned_to_id = ?, category = ?, due_date = ?, updated_at = ? WHERE id = ?
-  `).run(text, completed, completedAt, assignedToId, category, dueDate, updatedAt, id);
+    UPDATE todos SET text = ?, completed = ?, completed_at = ?, assigned_to_id = ?, category = ?, image_url = ?, due_date = ?, updated_at = ? WHERE id = ?
+  `).run(text, completed, completedAt, assignedToId, category, imageUrl, dueDate, updatedAt, id);
 
   return {
     id,
@@ -2270,6 +2306,7 @@ export function updateTodo(id: string, updates: Partial<TodoItem>) {
     completedAt,
     assignedToId,
     category,
+    imageUrl,
     dueDate,
     createdAt: current.created_at,
     updatedAt,
