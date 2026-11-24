@@ -959,6 +959,15 @@ function seedEscaneoProfesionalDocuments() {
       notes: 'Permiso de circulación israelí (רישיון רכב) Toyota Yaris HEV · Placa: 71-972-204 · Titular: Chaim (Jaime) Hadida.',
       files: [{ relPath: 'LICENCIA YARIS.pdf', destName: 'escaneo_licencia_yaris.pdf', label: 'Rishayon Rejev Yaris' }],
     },
+    {
+      id: 'escaneo_jaime_evento_malevo',
+      memberId: 'member_jaime',
+      category: 'EVENTOS Y ENTRADAS',
+      subcategory: 'Entradas',
+      title: 'EVENTO MALEVO (08/03/2027 20:00 hs - Ashdod)',
+      notes: '2 Entradas MALEVO (Sensación de Danza Argentina) · Lunes 08 de Marzo de 2027, 20:00 hs · Centro de Artes Escénicas de Ashdod (Derech Eretz 1, Ashdod) · Sector Parkett, Fila 17, Asientos 40 y 41 · Orden N° 21599 (IDs: 3022040 y 3022037).',
+      files: [{ relPath: 'EVENTO MALEVO.pdf', destName: 'escaneo_evento_malevo_jaime.pdf', label: 'Entradas Malevo PDF' }],
+    },
 
     // ================= SOFI =================
     {
@@ -1180,6 +1189,25 @@ function seedEscaneoProfesionalDocuments() {
   });
 
   seedTx();
+
+  // Ensure 'EVENTOS Y ENTRADAS' category exists for EVENTO MALEVO.pdf
+  const nowCatIso = new Date().toISOString();
+  db.prepare(`
+    INSERT OR IGNORE INTO data_categories (id, name, icon, color, description, subcategories_json, is_default, created_at)
+    VALUES ('cat_eventos', 'EVENTOS Y ENTRADAS', 'ticket', '#e11d48', 'Entradas a conciertos, espectáculos y eventos', '["Entradas"]', 1, ?)
+  `).run(nowCatIso);
+
+  // If the user created the placeholder To-Do item '📷 Foto / Imagen', attach EVENTO MALEVO.pdf to it
+  const malevoAttachment = copyEscaneoFile('EVENTO MALEVO.pdf', 'escaneo_evento_malevo_jaime.pdf', 'EVENTO MALEVO');
+  if (malevoAttachment) {
+    db.prepare(`
+      UPDATE todos
+      SET text = 'EVENTO MALEVO (08/03/2027 20:00 hs · Fila 17 Asientos 40 y 41)',
+          image_url = ?,
+          updated_at = ?
+      WHERE (text = '📷 Foto / Imagen' OR text = '📷 Imagen') AND (image_url = '' OR image_url IS NULL)
+    `).run(malevoAttachment.fileUrl, nowCatIso);
+  }
 }
 
 function hashPin(pin: string): string {
@@ -2249,14 +2277,15 @@ export function deleteContact(id: string): boolean {
 // Todos
 function saveTodoImageToDisk(imageUrl: string | undefined, todoId: string): string {
   if (!imageUrl) return '';
-  if (!imageUrl.startsWith('data:image/')) return imageUrl;
+  if (!imageUrl.startsWith('data:')) return imageUrl;
   try {
-    const matches = imageUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+    const matches = imageUrl.match(/^data:([^;]+);base64,(.+)$/);
     if (!matches) return imageUrl;
     const mime = matches[1].toLowerCase();
     const rawBuf = Buffer.from(matches[2], 'base64');
     let ext = '.jpg';
-    if (mime.includes('png')) ext = '.png';
+    if (mime.includes('pdf')) ext = '.pdf';
+    else if (mime.includes('png')) ext = '.png';
     else if (mime.includes('webp')) ext = '.webp';
     else if (mime.includes('gif')) ext = '.gif';
     const safeId = todoId.replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -2265,7 +2294,7 @@ function saveTodoImageToDisk(imageUrl: string | undefined, todoId: string): stri
     fs.writeFileSync(filePath, rawBuf);
     return `/uploads/${fileName}`;
   } catch (err) {
-    console.error('Error saving todo image to disk:', err);
+    console.error('Error saving todo image/pdf to disk:', err);
     return imageUrl;
   }
 }

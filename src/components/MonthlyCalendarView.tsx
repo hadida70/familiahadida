@@ -789,14 +789,14 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
             <input
               ref={panelNewFileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/*,.pdf,application/pdf"
               onChange={handlePanelNewImageSelect}
               className="hidden"
             />
             <input
               ref={panelItemFileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/*,.pdf,application/pdf"
               onChange={handlePanelItemImageSelect}
               className="hidden"
             />
@@ -906,14 +906,21 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
                           <button
                             type="button"
                             onClick={() => setPanelPreviewTodo(todo)}
-                            className="w-7 h-7 rounded-md overflow-hidden border border-slate-200 dark:border-slate-700 shrink-0 cursor-pointer hover:opacity-90"
-                            title="Ver foto"
+                            className="w-7 h-7 rounded-md overflow-hidden border border-slate-200 dark:border-slate-700 shrink-0 cursor-pointer hover:opacity-90 flex items-center justify-center bg-red-50 dark:bg-red-950/60"
+                            title="Ver archivo"
                           >
-                            <img
-                              src={todo.imageUrl}
-                              alt={todo.text}
-                              className="w-full h-full object-cover"
-                            />
+                            {todo.imageUrl.toLowerCase().endsWith('.pdf') ||
+                            todo.imageUrl.startsWith('data:application/pdf') ? (
+                              <span className="text-[8px] font-black text-red-600 dark:text-red-400">
+                                PDF
+                              </span>
+                            ) : (
+                              <img
+                                src={todo.imageUrl}
+                                alt={todo.text}
+                                className="w-full h-full object-cover"
+                              />
+                            )}
                           </button>
                         )}
 
@@ -1003,11 +1010,20 @@ export const MonthlyCalendarView: React.FC<MonthlyCalendarViewProps> = ({
                   </div>
                 </div>
                 <div className="p-3 bg-slate-950 flex items-center justify-center max-h-[75vh] overflow-auto">
-                  <img
-                    src={panelPreviewTodo.imageUrl}
-                    alt={panelPreviewTodo.text}
-                    className="max-h-[70vh] w-auto object-contain rounded-xl"
-                  />
+                  {panelPreviewTodo.imageUrl.toLowerCase().endsWith('.pdf') ||
+                  panelPreviewTodo.imageUrl.startsWith('data:application/pdf') ? (
+                    <iframe
+                      src={panelPreviewTodo.imageUrl}
+                      title={panelPreviewTodo.text}
+                      className="w-full h-[70vh] rounded-xl bg-white border-0"
+                    />
+                  ) : (
+                    <img
+                      src={panelPreviewTodo.imageUrl}
+                      alt={panelPreviewTodo.text}
+                      className="max-h-[70vh] w-auto object-contain rounded-xl"
+                    />
+                  )}
                 </div>
               </div>
             </div>

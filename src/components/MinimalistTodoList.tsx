@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   Camera,
   Image as ImageIcon,
+  FileText,
 } from 'lucide-react';
 import { TodoItem, Member } from '../types';
 import { sounds } from '../lib/sound';
@@ -169,18 +170,18 @@ export const MinimalistTodoList: React.FC<MinimalistTodoListProps> = ({
 
   return (
     <div className="w-full max-w-2xl mx-auto space-y-3 pb-16">
-      {/* Hidden file inputs for new item image and existing item image */}
+      {/* Hidden file inputs for new item image/PDF and existing item image/PDF */}
       <input
         ref={newFileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,.pdf,application/pdf"
         onChange={handleNewImageSelect}
         className="hidden"
       />
       <input
         ref={itemFileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,.pdf,application/pdf"
         onChange={handleItemImageSelect}
         className="hidden"
       />
@@ -225,27 +226,35 @@ export const MinimalistTodoList: React.FC<MinimalistTodoListProps> = ({
           </button>
         </div>
 
-        {/* Selected photo preview before saving */}
+        {/* Selected photo/PDF preview before saving */}
         {newImageUrl && (
           <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
-            <img
-              src={newImageUrl}
-              alt="Vista previa"
-              className="w-12 h-12 rounded-lg object-cover border border-slate-200 dark:border-slate-700"
-            />
+            {newImageUrl.toLowerCase().endsWith('.pdf') ||
+            newImageUrl.startsWith('data:application/pdf') ? (
+              <div className="w-12 h-12 rounded-lg bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-900 text-red-600 flex flex-col items-center justify-center shrink-0">
+                <FileText className="w-5 h-5" />
+                <span className="text-[9px] font-black">PDF</span>
+              </div>
+            ) : (
+              <img
+                src={newImageUrl}
+                alt="Vista previa"
+                className="w-12 h-12 rounded-lg object-cover border border-slate-200 dark:border-slate-700"
+              />
+            )}
             <div className="flex-1 min-w-0">
               <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                📷 Imagen adjunta lista para agregar
+                📎 Archivo adjunto listo para agregar
               </p>
               <p className="text-[11px] text-slate-400">
-                Presiona Agregar o Enter para guardar la tarea con su foto
+                Presiona Agregar o Enter para guardar la tarea con su foto o PDF
               </p>
             </div>
             <button
               type="button"
               onClick={() => setNewImageUrl('')}
               className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer"
-              title="Quitar imagen"
+              title="Quitar archivo"
             >
               <X className="w-4 h-4" />
             </button>
@@ -361,19 +370,27 @@ export const MinimalistTodoList: React.FC<MinimalistTodoListProps> = ({
                       )}
                     </button>
 
-                    {/* Attached Photo Thumbnail */}
+                    {/* Attached Photo or PDF Thumbnail */}
                     {todo.imageUrl && (
                       <button
                         type="button"
                         onClick={() => setPreviewImageTodo(todo)}
-                        className="relative w-11 h-11 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shrink-0 group/img cursor-pointer shadow-2xs"
-                        title="Ver imagen"
+                        className="relative w-11 h-11 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shrink-0 group/img cursor-pointer shadow-2xs flex items-center justify-center bg-red-50 dark:bg-red-950/50"
+                        title="Ver archivo adjunto"
                       >
-                        <img
-                          src={todo.imageUrl}
-                          alt={todo.text}
-                          className="w-full h-full object-cover group-hover/img:scale-105 transition-transform"
-                        />
+                        {todo.imageUrl.toLowerCase().endsWith('.pdf') ||
+                        todo.imageUrl.startsWith('data:application/pdf') ? (
+                          <div className="flex flex-col items-center justify-center text-red-600 dark:text-red-400">
+                            <FileText className="w-5 h-5" />
+                            <span className="text-[9px] font-black leading-none mt-0.5">PDF</span>
+                          </div>
+                        ) : (
+                          <img
+                            src={todo.imageUrl}
+                            alt={todo.text}
+                            className="w-full h-full object-cover group-hover/img:scale-105 transition-transform"
+                          />
+                        )}
                       </button>
                     )}
 
@@ -464,14 +481,14 @@ export const MinimalistTodoList: React.FC<MinimalistTodoListProps> = ({
         </AnimatePresence>
       </div>
 
-      {/* Full-screen Photo Preview Modal */}
+      {/* Full-screen Photo / PDF Preview Modal */}
       {previewImageTodo && previewImageTodo.imageUrl && (
         <div
           className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4"
           onClick={() => setPreviewImageTodo(null)}
         >
           <div
-            className="relative bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 max-w-2xl w-full overflow-hidden shadow-2xl"
+            className="relative bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 max-w-3xl w-full overflow-hidden shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
@@ -479,6 +496,14 @@ export const MinimalistTodoList: React.FC<MinimalistTodoListProps> = ({
                 {previewImageTodo.text}
               </p>
               <div className="flex items-center gap-1.5">
+                <a
+                  href={previewImageTodo.imageUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2.5 py-1 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-red-50 hover:text-red-600 cursor-pointer"
+                >
+                  Abrir en pestaña
+                </a>
                 <button
                   type="button"
                   onClick={() => {
@@ -488,7 +513,7 @@ export const MinimalistTodoList: React.FC<MinimalistTodoListProps> = ({
                   className="px-2.5 py-1 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 cursor-pointer flex items-center gap-1"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
-                  <span>Quitar foto</span>
+                  <span>Quitar archivo</span>
                 </button>
                 <button
                   type="button"
@@ -499,12 +524,21 @@ export const MinimalistTodoList: React.FC<MinimalistTodoListProps> = ({
                 </button>
               </div>
             </div>
-            <div className="p-3 bg-slate-950 flex items-center justify-center max-h-[75vh] overflow-auto">
-              <img
-                src={previewImageTodo.imageUrl}
-                alt={previewImageTodo.text}
-                className="max-h-[70vh] w-auto object-contain rounded-xl"
-              />
+            <div className="p-3 bg-slate-950 flex items-center justify-center max-h-[80vh] overflow-auto">
+              {previewImageTodo.imageUrl.toLowerCase().endsWith('.pdf') ||
+              previewImageTodo.imageUrl.startsWith('data:application/pdf') ? (
+                <iframe
+                  src={previewImageTodo.imageUrl}
+                  title={previewImageTodo.text}
+                  className="w-full h-[72vh] rounded-xl bg-white border-0"
+                />
+              ) : (
+                <img
+                  src={previewImageTodo.imageUrl}
+                  alt={previewImageTodo.text}
+                  className="max-h-[72vh] w-auto object-contain rounded-xl"
+                />
+              )}
             </div>
           </div>
         </div>
